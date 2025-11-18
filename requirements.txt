@@ -1,0 +1,29 @@
+# FastAPI Backend
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Streamlit Frontend
+streamlit==1.28.1
+
+# Vector Database
+faiss-cpu>=1.8.0
+numpy>=1.24.3
+
+# Embeddings
+sentence-transformers>=2.7.0
+torch>=2.2.0
+
+# Document Parsing
+PyMuPDF==1.23.5
+beautifulsoup4>=4.12.0
+markdown>=3.5.0
+
+# LLM Interfaces
+requests==2.31.0
+groq==0.3.0
+
+# Utilities
+pydantic==2.5.0
+python-dotenv==1.0.0
+

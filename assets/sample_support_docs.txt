@@ -1,0 +1,60 @@
+AUTONOMOUS QA AGENT - SUPPORT DOCUMENTATION
+===========================================
+
+OVERVIEW
+--------
+The Autonomous QA Agent is an intelligent system designed to answer questions based on ingested documents. It uses Retrieval-Augmented Generation (RAG) to provide accurate, context-aware responses.
+
+KEY FEATURES
+------------
+1. Document Ingestion: Supports PDF, HTML, JSON, and plain text files
+2. Vector Search: Uses FAISS for efficient similarity search
+3. Question Answering: Generates answers using LLM with retrieved context
+4. Selenium Script Generation: Creates automation scripts based on descriptions
+
+DOCUMENT FORMATS SUPPORTED
+--------------------------
+- PDF files (.pdf): Parsed using PyMuPDF (fitz)
+- HTML files (.html, .htm): Parsed using unstructured library
+- JSON files (.json): Converted to readable text format
+- Text files (.txt): Direct text processing
+
+USAGE INSTRUCTIONS
+------------------
+1. Upload Documents:
+   - Use the Document Ingestion page to upload your documents
+   - Multiple files can be uploaded at once
+   - Documents are automatically chunked and indexed
+
+2. Ask Questions:
+   - Navigate to Question Answering page
+   - Enter your question in natural language
+   - The system retrieves relevant context and generates an answer
+
+3. Generate Selenium Scripts:
+   - Describe the automation task you want to perform
+   - Optionally provide URL and specific actions
+   - The system generates a Python Selenium script
+
+TROUBLESHOOTING
+---------------
+- If documents fail to upload, check file format compatibility
+- For LLM errors, ensure your LLM provider (Ollama/Groq) is running
+- Vector database issues may require re-indexing documents
+
+API ENDPOINTS
+------------
+- POST /api/ingestion/upload: Upload single document
+- POST /api/ingestion/upload-multiple: Upload multiple documents
+- GET /api/ingestion/stats: Get ingestion statistics
+- POST /api/generation/qa: Generate answer to question
+- POST /api/generation/selenium-script: Generate Selenium script
+- GET /health: Health check endpoint
+
+CONFIGURATION
+-------------
+- Embedding Model: all-MiniLM-L6-v2 (default)
+- Vector DB Dimension: 384
+- Chunk Size: 1000 characters
+- Chunk Overlap: 200 characters
+

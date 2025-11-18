@@ -3,10 +3,11 @@ API endpoints for QA generation and Selenium script generation.
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import os
 import json
 import re
+from bs4 import BeautifulSoup
 
 router = APIRouter(prefix="/api/generation", tags=["generation"])
 
@@ -98,6 +99,15 @@ class TestCaseRequest(BaseModel):
     output_format: str = "json"  # "json" or "markdown"
 
 
+class ScriptGenerationRequest(BaseModel):
+    """Request model for Selenium script generation."""
+    test_case: Dict[str, Any]  # Selected test case JSON
+    checkout_html: str  # Full checkout.html content
+    url: Optional[str] = None
+    k: int = 5
+    max_tokens: int = 3000
+
+
 @router.post("/qa")
 async def generate_answer(request: QARequest):
     """
@@ -168,6 +178,173 @@ Generate a complete, runnable Selenium script with proper imports and error hand
             "script": script,
             "language": "python"
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating script: {str(e)}")
+
+
+def extract_html_selectors(html_content: str) -> Dict[str, List[str]]:
+    """
+    Extract IDs, names, and classes from HTML content.
+    
+    Args:
+        html_content: HTML content as string
+        
+    Returns:
+        Dictionary with 'ids', 'names', 'classes', and 'selectors' (formatted)
+    """
+    soup = BeautifulSoup(html_content, 'html.parser')
+    
+    # Extract IDs
+    ids = []
+    for element in soup.find_all(attrs={"id": True}):
+        ids.append(element.get("id"))
+    
+    # Extract names
+    names = []
+    for element in soup.find_all(attrs={"name": True}):
+        names.append(element.get("name"))
+    
+    # Extract classes
+    classes = []
+    for element in soup.find_all(attrs={"class": True}):
+        element_classes = element.get("class", [])
+        if isinstance(element_classes, list):
+            classes.extend(element_classes)
+        else:
+            classes.append(element_classes)
+    
+    # Remove duplicates
+    ids = list(set(ids))
+    names = list(set(names))
+    classes = list(set(classes))
+    
+    # Create formatted selector information
+    selectors_info = []
+    
+    # Add ID selectors
+    for id_val in ids:
+        selectors_info.append(f"#id: #{id_val}")
+    
+    # Add name selectors
+    for name_val in names:
+        selectors_info.append(f"#name: [name='{name_val}']")
+    
+    # Add class selectors (show first 20 to avoid too much output)
+    for class_val in classes[:20]:
+        selectors_info.append(f"#class: .{class_val}")
+    
+    return {
+        "ids": ids,
+        "names": names,
+        "classes": classes[:20],  # Limit to first 20 classes
+        "selectors": selectors_info
+    }
+
+
+@router.post("/generate_script")
+async def generate_script(request: ScriptGenerationRequest):
+    """
+    Generate Selenium script from test case and HTML.
+    
+    Process:
+    1. Parse checkout.html to extract IDs/names/classes
+    2. Retrieve relevant documentation chunks
+    3. Create prompt for LLM
+    4. Output final runnable Python script
+    
+    Args:
+        request: Script generation request with test case and HTML
+        
+    Returns:
+        Generated Selenium Python script
+    """
+    if rag_pipeline is None:
+        raise HTTPException(status_code=500, detail="RAG pipeline not initialized")
+    
+    try:
+        # Step 1: Parse checkout.html to extract IDs/names/classes
+        selectors = extract_html_selectors(request.checkout_html)
+        
+        # Step 2: Retrieve relevant documentation chunks using test case info
+        # Build query from test case
+        test_case_query = f"{request.test_case.get('Feature', '')} {request.test_case.get('Scenario', '')}"
+        if not test_case_query.strip():
+            test_case_query = "Selenium automation testing"
+        
+        contexts = rag_pipeline.retrieve_context(test_case_query, k=request.k)
+        context_text = rag_pipeline.format_context(contexts) if contexts else ""
+        
+        # Extract test case details
+        test_id = request.test_case.get("Test_ID", "TC_001")
+        feature = request.test_case.get("Feature", "Checkout")
+        scenario = request.test_case.get("Scenario", "")
+        steps = request.test_case.get("Steps", "")
+        expected_result = request.test_case.get("Expected_Result", "")
+        
+        # Step 3: Create comprehensive prompt for LLM
+        prompt = f"""You are a Selenium Python expert. Generate a complete, runnable Selenium script based on the test case and HTML structure provided.
+
+Test Case Information:
+- Test_ID: {test_id}
+- Feature: {feature}
+- Scenario: {scenario}
+- Steps: {steps}
+- Expected_Result: {expected_result}
+
+HTML Selectors Available:
+IDs: {', '.join(selectors['ids'][:10])}
+Names: {', '.join(selectors['names'][:10])}
+Classes: {', '.join(selectors['classes'][:10])}
+
+Full Selector List:
+{chr(10).join(selectors['selectors'])}
+
+Relevant Documentation:
+{context_text if context_text else "No additional documentation provided."}
+
+Requirements:
+1. Use webdriver.Chrome() for browser initialization
+2. Use correct selectors based on the HTML structure (prefer IDs, then names, then classes)
+3. Include proper imports: from selenium import webdriver, from selenium.webdriver.common.by import By, from selenium.webdriver.support.ui import WebDriverWait, from selenium.webdriver.support import expected_conditions as EC
+4. Include error handling with try-except blocks
+5. Add explicit waits using WebDriverWait where needed
+6. Include assertions to verify expected results
+7. Add comments explaining each step
+8. Close the browser at the end
+9. Make the script complete and runnable
+
+URL: {request.url if request.url else 'https://example.com/checkout'}
+
+Generate the complete Python Selenium script:"""
+
+        # Step 4: Generate script using LLM
+        script = llm.generate(prompt, max_tokens=request.max_tokens)
+        
+        # Clean up script - extract code block if present
+        script_cleaned = script.strip()
+        
+        # Remove markdown code block markers if present
+        if script_cleaned.startswith("```python"):
+            script_cleaned = script_cleaned.replace("```python", "").strip()
+        elif script_cleaned.startswith("```"):
+            script_cleaned = script_cleaned.replace("```", "").strip()
+        
+        if script_cleaned.endswith("```"):
+            script_cleaned = script_cleaned[:-3].strip()
+        
+        return {
+            "status": "success",
+            "test_id": test_id,
+            "script": script_cleaned,
+            "language": "python",
+            "selectors_used": {
+                "ids_count": len(selectors['ids']),
+                "names_count": len(selectors['names']),
+                "classes_count": len(selectors['classes'])
+            },
+            "sources": [ctx["metadata"] for ctx in contexts] if contexts else []
+        }
+    
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating script: {str(e)}")
 

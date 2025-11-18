@@ -62,6 +62,7 @@ async def root():
             "build_kb": "/api/ingestion/build_kb",
             "generation": "/api/generation",
             "generate_test_cases": "/api/generation/generate_test_cases",
+            "generate_script": "/api/generation/generate_script",
             "docs": "/docs"
         }
     }

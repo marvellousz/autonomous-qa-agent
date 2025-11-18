@@ -59,6 +59,7 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "ingestion": "/api/ingestion",
+            "build_kb": "/api/ingestion/build_kb",
             "generation": "/api/generation",
             "docs": "/docs"
         }

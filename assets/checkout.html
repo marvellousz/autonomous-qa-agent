@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - E-Commerce Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: #f9fafb;
+            color: #1f2937;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background-color: #ffffff;
+            padding: 20px 0;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        
+        .checkout-container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .checkout-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .checkout-form {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .form-section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1f2937;
+            border-bottom: 2px solid #2563eb;
+            padding-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 14px;
+            color: #374151;
+        }
+        
+        .required {
+            color: #ef4444;
+        }
+        
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        @media (max-width: 480px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .discount-section {
+            background-color: #f3f4f6;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .discount-input-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .discount-input-group input {
+            flex: 1;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: #2563eb;
+            color: #ffffff;
+        }
+        
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-secondary {
+            background-color: #ffffff;
+            color: #2563eb;
+            border: 2px solid #2563eb;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #eff6ff;
+        }
+        
+        .order-summary {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 20px;
+        }
+        
+        .summary-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1f2937;
+        }
+        
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+        
+        .summary-total {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-top: 10px;
+        }
+        
+        .discount-applied {
+            color: #10b981;
+            font-weight: 500;
+        }
+        
+        .payment-method {
+            margin-bottom: 15px;
+        }
+        
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .radio-option {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        
+        .radio-option:hover {
+            border-color: #2563eb;
+        }
+        
+        .radio-option input[type="radio"] {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+        }
+        
+        .radio-option input[type="radio"]:checked + label {
+            color: #2563eb;
+            font-weight: 500;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-top: 15px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+        }
+        
+        .error-message {
+            color: #ef4444;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .success-message {
+            color: #10b981;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .complete-order-btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 18px;
+            margin-top: 20px;
+        }
+        
+        .progress-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+        }
+        
+        .progress-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+        
+        .progress-step::after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            width: 100%;
+            height: 2px;
+            background-color: #e5e7eb;
+            z-index: 0;
+        }
+        
+        .progress-step:last-child::after {
+            display: none;
+        }
+        
+        .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #e5e7eb;
+            color: #6b7280;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .step-number.active {
+            background-color: #2563eb;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="logo">E-Commerce Platform</div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="progress-indicator">
+            <div class="progress-step">
+                <div class="step-number active">1</div>
+                <div>Shipping</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number active">2</div>
+                <div>Payment</div>
+            </div>
+            <div class="progress-step">
+                <div class="step-number">3</div>
+                <div>Review</div>
+            </div>
+        </div>
+        
+        <div class="checkout-container">
+            <div class="checkout-form">
+                <form id="checkoutForm">
+                    <!-- Shipping Information Section -->
+                    <div class="form-section">
+                        <h2 class="section-title">Shipping Information</h2>
+                        
+                        <div class="form-group">
+                            <label for="name">Full Name <span class="required">*</span></label>
+                            <input type="text" id="name" name="name" required placeholder="John Doe">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Email Address <span class="required">*</span></label>
+                            <input type="email" id="email" name="email" required placeholder="john.doe@example.com">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="address">Address Line 1 <span class="required">*</span></label>
+                            <input type="text" id="address" name="address" required placeholder="123 Main Street">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="address2">Address Line 2 (Optional)</label>
+                            <input type="text" id="address2" name="address2" placeholder="Apartment, suite, etc.">
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="city">City <span class="required">*</span></label>
+                                <input type="text" id="city" name="city" required placeholder="New York">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="zip">ZIP Code <span class="required">*</span></label>
+                                <input type="text" id="zip" name="zip" required placeholder="10001">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="country">Country <span class="required">*</span></label>
+                            <select id="country" name="country" required>
+                                <option value="">Select Country</option>
+                                <option value="US">United States</option>
+                                <option value="CA">Canada</option>
+                                <option value="GB">United Kingdom</option>
+                                <option value="AU">Australia</option>
+                                <option value="DE">Germany</option>
+                                <option value="FR">France</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="phone">Phone Number (Optional)</label>
+                            <input type="tel" id="phone" name="phone" placeholder="+1 (555) 123-4567">
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Method Section -->
+                    <div class="form-section">
+                        <h2 class="section-title">Payment Method</h2>
+                        
+                        <div class="payment-method">
+                            <div class="radio-group">
+                                <div class="radio-option">
+                                    <input type="radio" id="credit" name="payment" value="credit" checked>
+                                    <label for="credit">Credit Card</label>
+                                </div>
+                                
+                                <div class="radio-option">
+                                    <input type="radio" id="debit" name="payment" value="debit">
+                                    <label for="debit">Debit Card</label>
+                                </div>
+                                
+                                <div class="radio-option">
+                                    <input type="radio" id="paypal" name="payment" value="paypal">
+                                    <label for="paypal">PayPal</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="paymentDetails">
+                            <div class="form-group">
+                                <label for="cardNumber">Card Number <span class="required">*</span></label>
+                                <input type="text" id="cardNumber" name="cardNumber" required placeholder="1234 5678 9012 3456" maxlength="19">
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="expiry">Expiry Date <span class="required">*</span></label>
+                                    <input type="text" id="expiry" name="expiry" required placeholder="MM/YY" maxlength="5">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="cvv">CVV <span class="required">*</span></label>
+                                    <input type="text" id="cvv" name="cvv" required placeholder="123" maxlength="4">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="cardholder">Cardholder Name <span class="required">*</span></label>
+                                <input type="text" id="cardholder" name="cardholder" required placeholder="John Doe">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Discount Code Section -->
+                    <div class="form-section">
+                        <div class="discount-section">
+                            <h3 style="margin-bottom: 15px;">Discount Code</h3>
+                            <div class="discount-input-group">
+                                <input type="text" id="discountCode" name="discountCode" placeholder="Enter discount code">
+                                <button type="button" class="btn btn-secondary" id="applyDiscount">Apply</button>
+                            </div>
+                            <div id="discountMessage"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Terms and Conditions -->
+                    <div class="form-section">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="terms" name="terms" required>
+                            <label for="terms">I agree to the Terms and Conditions and Privacy Policy <span class="required">*</span></label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Order Summary -->
+            <div class="order-summary">
+                <h2 class="summary-title">Order Summary</h2>
+                
+                <div class="summary-item">
+                    <span>Subtotal</span>
+                    <span id="subtotal">$99.99</span>
+                </div>
+                
+                <div class="summary-item">
+                    <span>Shipping</span>
+                    <span id="shipping">$5.99</span>
+                </div>
+                
+                <div class="summary-item">
+                    <span>Tax</span>
+                    <span id="tax">$8.50</span>
+                </div>
+                
+                <div class="summary-item" id="discountRow" style="display: none;">
+                    <span>Discount</span>
+                    <span class="discount-applied" id="discountAmount">-$0.00</span>
+                </div>
+                
+                <div class="summary-item summary-total">
+                    <span>Total</span>
+                    <span id="total">$114.48</span>
+                </div>
+                
+                <button type="submit" class="btn btn-primary complete-order-btn" form="checkoutForm">Complete Order</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Discount code application
+        document.getElementById('applyDiscount').addEventListener('click', function() {
+            const code = document.getElementById('discountCode').value.trim();
+            const messageDiv = document.getElementById('discountMessage');
+            
+            if (!code) {
+                messageDiv.innerHTML = '<div class="error-message">Please enter a discount code</div>';
+                return;
+            }
+            
+            // Simulate discount code validation
+            const validCodes = ['WELCOME10', 'SAVE20', 'FREESHIP', 'SUMMER25'];
+            const codeUpper = code.toUpperCase();
+            
+            if (validCodes.includes(codeUpper)) {
+                messageDiv.innerHTML = '<div class="success-message">Discount code applied successfully!</div>';
+                document.getElementById('discountRow').style.display = 'flex';
+                document.getElementById('discountAmount').textContent = '-$10.00';
+                updateTotal();
+            } else {
+                messageDiv.innerHTML = '<div class="error-message">Invalid or expired discount code</div>';
+                document.getElementById('discountRow').style.display = 'none';
+                updateTotal();
+            }
+        });
+        
+        function updateTotal() {
+            const subtotal = 99.99;
+            const shipping = 5.99;
+            const tax = 8.50;
+            const discount = document.getElementById('discountRow').style.display === 'none' ? 0 : 10.00;
+            const total = subtotal + shipping + tax - discount;
+            
+            document.getElementById('total').textContent = '$' + total.toFixed(2);
+        }
+        
+        // Form submission
+        document.getElementById('checkoutForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            alert('Order submitted! (This is a sample checkout page)');
+        });
+        
+        // Card number formatting
+        document.getElementById('cardNumber').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\s/g, '');
+            let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+            e.target.value = formattedValue;
+        });
+        
+        // Expiry date formatting
+        document.getElementById('expiry').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2, 4);
+            }
+            e.target.value = value;
+        });
+    </script>
+</body>
+</html>
+

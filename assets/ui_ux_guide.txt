@@ -1,0 +1,324 @@
+E-Commerce Platform UI/UX Design Guide
+========================================
+
+Version 1.0
+Last Updated: 2024-01-15
+
+OVERVIEW
+--------
+This guide outlines the user interface and user experience standards for the E-Commerce Platform. All UI components, interactions, and user flows should follow these guidelines to ensure consistency and usability.
+
+COLOR SCHEME
+------------
+Primary Color: #2563eb (Blue)
+Secondary Color: #10b981 (Green)
+Accent Color: #f59e0b (Amber)
+Error Color: #ef4444 (Red)
+Success Color: #10b981 (Green)
+Warning Color: #f59e0b (Amber)
+Text Primary: #1f2937 (Dark Gray)
+Text Secondary: #6b7280 (Medium Gray)
+Background: #ffffff (White)
+Background Secondary: #f9fafb (Light Gray)
+
+TYPOGRAPHY
+----------
+Primary Font: Inter, sans-serif
+Secondary Font: Georgia, serif (for product descriptions)
+Heading Sizes:
+  - H1: 32px, Bold
+  - H2: 24px, Bold
+  - H3: 20px, Semi-bold
+  - H4: 18px, Semi-bold
+Body Text: 16px, Regular
+Small Text: 14px, Regular
+Button Text: 16px, Semi-bold
+
+LAYOUT STRUCTURE
+----------------
+Header:
+  - Logo (left)
+  - Search bar (center, 40% width)
+  - User account icon (right)
+  - Shopping cart icon (right, shows item count badge)
+  - Navigation menu (below header)
+
+Main Content Area:
+  - Maximum width: 1200px
+  - Centered with padding: 20px
+  - Responsive grid system
+
+Footer:
+  - Company information
+  - Links to: About, Contact, Privacy Policy, Terms
+  - Social media icons
+  - Copyright notice
+
+BUTTONS
+-------
+Primary Button:
+  - Background: Primary color (#2563eb)
+  - Text: White
+  - Padding: 12px 24px
+  - Border radius: 6px
+  - Hover: Darker shade (10% darker)
+  - Active: Pressed effect (shadow inset)
+
+Secondary Button:
+  - Background: Transparent
+  - Border: 2px solid primary color
+  - Text: Primary color
+  - Padding: 12px 24px
+  - Border radius: 6px
+
+Danger Button:
+  - Background: Error color (#ef4444)
+  - Text: White
+  - Used for delete/remove actions
+
+Button States:
+  - Default: Full opacity
+  - Hover: Slight scale (1.02) and shadow
+  - Active: Scale down (0.98)
+  - Disabled: 50% opacity, cursor not-allowed
+
+FORM ELEMENTS
+-------------
+Input Fields:
+  - Height: 44px
+  - Padding: 12px 16px
+  - Border: 1px solid #d1d5db
+  - Border radius: 6px
+  - Focus: Border color changes to primary, shadow appears
+  - Error state: Border color changes to error color
+  - Placeholder text: Secondary text color, italic
+
+Labels:
+  - Font size: 14px
+  - Font weight: Semi-bold
+  - Color: Text primary
+  - Required indicator: Red asterisk (*)
+
+Checkboxes and Radio Buttons:
+  - Size: 20px x 20px
+  - Border: 2px solid #d1d5db
+  - Checked: Primary color background
+  - Hover: Border color changes to primary
+
+Select Dropdowns:
+  - Same styling as input fields
+  - Dropdown arrow on the right
+  - Options: Padding 12px, hover background #f3f4f6
+
+CHECKOUT PAGE SPECIFICATIONS
+-----------------------------
+Layout:
+  - Two-column layout on desktop (form left, summary right)
+  - Single column on mobile
+  - Progress indicator at top showing steps
+
+Form Sections:
+  1. Shipping Information
+     - Full Name (required)
+     - Email (required, validated)
+     - Address Line 1 (required)
+     - Address Line 2 (optional)
+     - City (required)
+     - ZIP Code (required, validated)
+     - Country (required, dropdown)
+     - Phone Number (optional)
+
+  2. Payment Method
+     - Radio button selection
+     - Credit Card (default)
+     - Debit Card
+     - PayPal
+     - Payment form appears based on selection
+
+  3. Discount Code
+     - Input field with "Apply" button
+     - Success message when code applied
+     - Error message for invalid codes
+     - Applied discount shown in summary
+
+  4. Order Summary
+     - Fixed position on right (desktop)
+     - Sticky at bottom (mobile)
+     - Shows: Items, Subtotal, Shipping, Tax, Discount, Total
+     - "Complete Order" button at bottom
+
+Form Validation:
+  - Real-time validation on blur
+  - Error messages appear below fields
+  - Submit button disabled until all required fields valid
+  - Visual indicators: green checkmark for valid, red X for invalid
+
+INTERACTIVE ELEMENTS
+--------------------
+Hover Effects:
+  - Buttons: Scale and shadow
+  - Links: Underline and color change
+  - Product cards: Shadow and slight lift
+  - Images: Slight zoom (1.05)
+
+Loading States:
+  - Spinner animation for async operations
+  - Skeleton screens for content loading
+  - Progress bars for multi-step processes
+  - Button shows loading spinner when processing
+
+Feedback Messages:
+  - Success: Green background, white text, checkmark icon
+  - Error: Red background, white text, X icon
+  - Warning: Amber background, dark text, warning icon
+  - Info: Blue background, white text, info icon
+  - Auto-dismiss after 5 seconds or manual close
+
+MODAL DIALOGS
+-------------
+Overlay: Semi-transparent black (rgba(0,0,0,0.5))
+Modal Box:
+  - Max width: 500px
+  - Centered on screen
+  - White background
+  - Border radius: 8px
+  - Shadow: Large, soft
+  - Close button: X icon in top right
+
+RESPONSIVE DESIGN
+-----------------
+Breakpoints:
+  - Mobile: < 768px
+  - Tablet: 768px - 1024px
+  - Desktop: > 1024px
+
+Mobile Adaptations:
+  - Single column layout
+  - Hamburger menu for navigation
+  - Full-width buttons
+  - Stacked form fields
+  - Bottom navigation bar
+  - Touch-friendly targets (minimum 44px)
+
+Tablet Adaptations:
+  - Two-column layout where appropriate
+  - Larger touch targets
+  - Optimized spacing
+
+ACCESSIBILITY REQUIREMENTS
+---------------------------
+Keyboard Navigation:
+  - Tab order follows visual flow
+  - Focus indicators visible (2px outline)
+  - Skip links for main content
+  - Escape key closes modals
+
+Screen Readers:
+  - ARIA labels on all interactive elements
+  - Alt text for all images
+  - Form labels properly associated
+  - Error messages announced
+
+Color Contrast:
+  - Text meets WCAG AA standards (4.5:1 ratio)
+  - Buttons meet AAA standards (7:1 ratio)
+  - Error states use icons in addition to color
+
+ANIMATIONS AND TRANSITIONS
+---------------------------
+Duration: 200-300ms for most transitions
+Easing: ease-in-out
+Animations:
+  - Fade in: opacity 0 to 1
+  - Slide in: translateY(-10px) to 0
+  - Scale: scale(0.95) to scale(1)
+  - No animations for reduced motion preference
+
+USER FLOWS
+----------
+Add to Cart Flow:
+  1. User clicks "Add to Cart" button
+  2. Button shows loading state
+  3. Success message appears
+  4. Cart icon badge updates
+  5. Optional: Cart slide-out panel opens
+
+Checkout Flow:
+  1. User clicks "Checkout" button
+  2. Redirected to checkout page
+  3. Progress indicator shows current step
+  4. User fills shipping information
+  5. User selects payment method
+  6. User applies discount code (optional)
+  7. User reviews order summary
+  8. User clicks "Complete Order"
+  9. Loading state during processing
+  10. Success: Redirect to confirmation page
+  11. Error: Show error message, allow retry
+
+Search Flow:
+  1. User types in search bar
+  2. Autocomplete appears after 3 characters
+  3. User selects suggestion or presses Enter
+  4. Results page loads
+  5. User can filter and sort results
+  6. User clicks product to view details
+
+ERROR HANDLING UI
+-----------------
+Form Errors:
+  - Red border on invalid fields
+  - Error message below field
+  - Icon indicator (X) next to field
+  - Summary of errors at top of form
+
+System Errors:
+  - Error page for 404, 500 errors
+  - Friendly error messages
+  - Suggestions for resolution
+  - Contact support option
+
+Network Errors:
+  - Toast notification
+  - Retry button
+  - Offline indicator
+
+PERFORMANCE GUIDELINES
+-----------------------
+Image Optimization:
+  - Lazy loading for below-fold images
+  - WebP format with fallback
+  - Responsive images (srcset)
+  - Maximum file size: 200KB per image
+
+Code Optimization:
+  - Minified CSS and JavaScript
+  - Code splitting for large bundles
+  - Caching strategies implemented
+  - CDN for static assets
+
+PERFORMANCE TARGETS
+-------------------
+- First Contentful Paint: < 1.5s
+- Time to Interactive: < 3.5s
+- Largest Contentful Paint: < 2.5s
+- Cumulative Layout Shift: < 0.1
+
+TESTING REQUIREMENTS
+--------------------
+Browser Testing:
+  - Chrome, Firefox, Safari, Edge (latest 2 versions)
+  - Mobile browsers: Safari iOS, Chrome Android
+
+Device Testing:
+  - iPhone (various models)
+  - Android phones (various models)
+  - Tablets (iPad, Android tablets)
+  - Desktop (Windows, macOS)
+
+Usability Testing:
+  - User testing sessions
+  - A/B testing for key flows
+  - Accessibility audits
+  - Performance audits
+

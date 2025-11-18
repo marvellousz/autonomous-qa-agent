@@ -5,6 +5,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import os
+import json
+import re
 
 router = APIRouter(prefix="/api/generation", tags=["generation"])
 
@@ -88,6 +90,14 @@ class SeleniumRequest(BaseModel):
     actions: Optional[List[str]] = None
 
 
+class TestCaseRequest(BaseModel):
+    """Request model for test case generation."""
+    query: str
+    k: int = 5
+    max_tokens: int = 2000
+    output_format: str = "json"  # "json" or "markdown"
+
+
 @router.post("/qa")
 async def generate_answer(request: QARequest):
     """
@@ -160,6 +170,109 @@ Generate a complete, runnable Selenium script with proper imports and error hand
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating script: {str(e)}")
+
+
+@router.post("/generate_test_cases")
+async def generate_test_cases(request: TestCaseRequest):
+    """
+    Generate test cases using RAG.
+    
+    Process:
+    1. Receive user query
+    2. Embed query
+    3. Retrieve top chunks from vector DB
+    4. Send (query + retrieved context) to LLM
+    5. Format output as structured Markdown or JSON
+    
+    Args:
+        request: Test case generation request
+        
+    Returns:
+        Generated test cases with grounding metadata
+    """
+    if rag_pipeline is None:
+        raise HTTPException(status_code=500, detail="RAG pipeline not initialized")
+    
+    try:
+        # Build prompt template for test case generation
+        prompt_template = """Based on the following context documents, generate comprehensive test cases.
+
+Context Documents:
+{context}
+
+User Query: {query}
+
+Generate test cases in the following format. For each test case, include:
+- Test_ID: A unique identifier
+- Feature: The feature being tested
+- Scenario: The test scenario description
+- Steps: Detailed test steps (numbered list)
+- Expected_Result: What should happen
+- Grounded_In: The source document name from the context
+
+Ensure all test cases are grounded in the provided context documents."""
+
+        # Use RAG to generate prompt with retrieved context
+        prompt, contexts = rag_pipeline.generate_with_rag(
+            query=request.query,
+            k=request.k,
+            prompt_template=prompt_template
+        )
+        
+        # Generate test cases using LLM
+        llm_response = llm.generate(prompt, max_tokens=request.max_tokens)
+        
+        # Extract source documents for grounding
+        source_documents = []
+        for ctx in contexts:
+            source = ctx["metadata"].get("source", "unknown")
+            if source not in source_documents:
+                source_documents.append(source)
+        
+        # Format response based on requested format
+        if request.output_format.lower() == "json":
+            # Try to parse JSON from LLM response, fallback to raw if parsing fails
+            # Try to extract JSON from response
+            json_match = re.search(r'\{.*\}', llm_response, re.DOTALL)
+            if json_match:
+                try:
+                    parsed_json = json.loads(json_match.group())
+                    return {
+                        "status": "success",
+                        "query": request.query,
+                        "test_cases": parsed_json,
+                        "grounded_in": source_documents,
+                        "sources": [ctx["metadata"] for ctx in contexts]
+                    }
+                except json.JSONDecodeError:
+                    pass
+            
+            # If JSON parsing fails, return structured format
+            return {
+                "status": "success",
+                "query": request.query,
+                "test_cases": {
+                    "raw_response": llm_response,
+                    "format": "markdown"
+                },
+                "grounded_in": source_documents,
+                "sources": [ctx["metadata"] for ctx in contexts]
+            }
+        else:
+            # Markdown format
+            return {
+                "status": "success",
+                "query": request.query,
+                "test_cases": llm_response,
+                "format": "markdown",
+                "grounded_in": source_documents,
+                "sources": [ctx["metadata"] for ctx in contexts]
+            }
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating test cases: {str(e)}")
 
 
 @router.get("/providers")

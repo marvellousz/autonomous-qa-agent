@@ -81,3 +81,45 @@ class RAGPipeline:
             formatted.append(f"[Document {i} from {source}]\n{text}\n")
         
         return "\n".join(formatted)
+    
+    def generate_with_rag(
+        self,
+        query: str,
+        k: int = 5,
+        prompt_template: Optional[str] = None
+    ) -> tuple[str, List[Dict]]:
+        """
+        Generate response using RAG (Retrieval-Augmented Generation).
+        
+        Args:
+            query: User query
+            k: Number of chunks to retrieve
+            prompt_template: Optional custom prompt template. If None, uses default.
+                           Use {query} and {context} as placeholders.
+        
+        Returns:
+            Tuple of (formatted_prompt, retrieved_contexts)
+        """
+        # Step 1: Embed query and retrieve top chunks
+        contexts = self.retrieve_context(query, k=k)
+        
+        if not contexts:
+            raise ValueError("No relevant context found in vector database")
+        
+        # Step 2: Format context
+        context_text = self.format_context(contexts)
+        
+        # Step 3: Build prompt with query and retrieved context
+        if prompt_template is None:
+            prompt = f"""Based on the following context documents, please provide a detailed response.
+
+Context Documents:
+{context_text}
+
+Query: {query}
+
+Response:"""
+        else:
+            prompt = prompt_template.format(query=query, context=context_text)
+        
+        return prompt, contexts

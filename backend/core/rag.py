@@ -4,8 +4,8 @@ Combines vector search with LLM generation.
 """
 from typing import List, Dict, Optional
 import os
-from backend.core.embeddings import EmbeddingGenerator
 from backend.core.vectordb import VectorDB
+from backend.core.chunking import TextChunker
 
 
 class RAGPipeline:
@@ -14,19 +14,21 @@ class RAGPipeline:
     def __init__(
         self,
         embedding_model: str = "all-MiniLM-L6-v2",
-        vectordb_dimension: int = 384,
-        vectordb_path: Optional[str] = None
+        vectordb_path: Optional[str] = None,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200
     ):
         """
         Initialize RAG pipeline.
         
         Args:
             embedding_model: Model name for embeddings
-            vectordb_dimension: Dimension of embeddings
             vectordb_path: Path to vector database
+            chunk_size: Size of text chunks
+            chunk_overlap: Overlap between chunks
         """
-        self.embedding_generator = EmbeddingGenerator(model_name=embedding_model)
-        self.vectordb = VectorDB(dimension=vectordb_dimension, index_path=vectordb_path)
+        self.vectordb = VectorDB(embedding_model=embedding_model, index_path=vectordb_path)
+        self.chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     
     def add_documents(self, texts: List[str], metadata: List[Dict]):
         """
@@ -36,8 +38,16 @@ class RAGPipeline:
             texts: List of text chunks
             metadata: List of metadata dicts
         """
-        embeddings = self.embedding_generator.generate_embeddings(texts)
-        self.vectordb.add_documents(embeddings, metadata)
+        # Prepare chunks in the format expected by VectorDB
+        chunks = []
+        for text, meta in zip(texts, metadata):
+            chunks.append({
+                "text": text,
+                "metadata": meta
+            })
+        
+        # Add to vector database (it handles chunking if needed)
+        self.vectordb.add_documents(chunks)
     
     def retrieve_context(self, query: str, k: int = 5) -> List[Dict]:
         """
@@ -48,19 +58,11 @@ class RAGPipeline:
             k: Number of documents to retrieve
             
         Returns:
-            List of relevant documents with metadata
+            List of relevant documents with metadata and scores
         """
-        query_embedding = self.embedding_generator.generate_embedding(query)
-        results = self.vectordb.search(query_embedding, k=k)
-        
-        return [
-            {
-                "text": result[0].get("text", ""),
-                "metadata": result[0],
-                "score": result[1]
-            }
-            for result in results
-        ]
+        # VectorDB.search now accepts text query directly
+        results = self.vectordb.search(query, k=k)
+        return results
     
     def format_context(self, contexts: List[Dict]) -> str:
         """
@@ -79,4 +81,3 @@ class RAGPipeline:
             formatted.append(f"[Document {i} from {source}]\n{text}\n")
         
         return "\n".join(formatted)
-

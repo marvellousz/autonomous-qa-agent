@@ -8,11 +8,13 @@ import tempfile
 from pathlib import Path
 from backend.core.parsers import DocumentParser
 from backend.core.rag import RAGPipeline
+from backend.core.chunking import TextChunker
 
 router = APIRouter(prefix="/api/ingestion", tags=["ingestion"])
 
 # Initialize components (in production, use dependency injection)
 parser = DocumentParser()
+chunker = TextChunker(chunk_size=1000, chunk_overlap=200)
 rag_pipeline = None  # Will be initialized in main.py
 
 
@@ -48,34 +50,14 @@ async def upload_document(file: UploadFile = File(...)):
         text = result["text"]
         metadata_dict = result["metadata"]
         
-        # Chunk the text for vector storage
-        chunk_size = 1000
-        chunk_overlap = 200
-        chunks = []
-        start = 0
+        # Use RecursiveCharacterTextSplitter to chunk the text
+        chunks = chunker.chunk_text(text)
         
-        while start < len(text):
-            end = start + chunk_size
-            chunk_text = text[start:end]
-            
-            # Try to break at sentence boundary
-            if end < len(text):
-                last_period = chunk_text.rfind('.')
-                last_newline = chunk_text.rfind('\n')
-                break_point = max(last_period, last_newline)
-                
-                if break_point > start + chunk_size * 0.5:
-                    chunk_text = chunk_text[:break_point + 1]
-                    end = start + break_point + 1
-            
-            chunks.append(chunk_text.strip())
-            start = end - chunk_overlap
+        # Prepare chunks with metadata
+        chunked_docs = [{"text": chunk, "metadata": metadata_dict.copy()} for chunk in chunks]
         
-        # Prepare metadata for each chunk
-        chunk_metadata = [metadata_dict.copy() for _ in chunks]
-        
-        # Add to RAG pipeline
-        rag_pipeline.add_documents(chunks, chunk_metadata)
+        # Add to RAG pipeline (which adds to vector DB)
+        rag_pipeline.add_documents([doc["text"] for doc in chunked_docs], [doc["metadata"] for doc in chunked_docs])
         
         return {
             "status": "success",

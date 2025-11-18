@@ -39,7 +39,6 @@ os.makedirs(os.path.dirname(vectordb_path), exist_ok=True)
 
 rag_pipeline = RAGPipeline(
     embedding_model="all-MiniLM-L6-v2",
-    vectordb_dimension=384,
     vectordb_path=vectordb_path
 )
 

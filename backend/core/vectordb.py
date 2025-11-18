@@ -1,6 +1,6 @@
 """
-Vector database module for storing and retrieving document embeddings.
-Supports both FAISS and ChromaDB backends.
+Vector database module using FAISS for similarity search.
+Supports document storage, retrieval, and persistence.
 """
 from typing import List, Dict, Optional, Tuple
 import numpy as np
@@ -8,20 +8,26 @@ import os
 import json
 import faiss
 from pathlib import Path
+from backend.core.embeddings import EmbeddingGenerator
 
 
 class VectorDB:
     """Vector database using FAISS for similarity search."""
     
-    def __init__(self, dimension: int = 384, index_path: Optional[str] = None):
+    def __init__(
+        self,
+        embedding_model: str = "all-MiniLM-L6-v2",
+        index_path: Optional[str] = None
+    ):
         """
         Initialize the vector database.
         
         Args:
-            dimension: Dimension of embeddings (default: 384 for all-MiniLM-L6-v2)
+            embedding_model: HuggingFace model name for embeddings
             index_path: Optional path to save/load FAISS index
         """
-        self.dimension = dimension
+        self.embedding_generator = EmbeddingGenerator(model_name=embedding_model)
+        self.dimension = self.embedding_generator.get_dimension()
         self.index_path = index_path or "data/faiss_index"
         self.index = None
         self.metadata = []
@@ -29,78 +35,127 @@ class VectorDB:
     
     def _initialize_index(self):
         """Initialize or load FAISS index."""
-        os.makedirs(os.path.dirname(self.index_path), exist_ok=True)
+        # Ensure directory exists
+        if self.index_path:
+            index_dir = os.path.dirname(self.index_path)
+            if index_dir:  # Only create directory if path has a directory component
+                os.makedirs(index_dir, exist_ok=True)
         
+        # Try to load existing index
         if os.path.exists(f"{self.index_path}.index"):
-            self.index = faiss.read_index(f"{self.index_path}.index")
-            self._load_metadata()
+            self.load()
         else:
-            # Use L2 distance (Euclidean)
+            # Create new index using L2 distance (Euclidean)
             self.index = faiss.IndexFlatL2(self.dimension)
+            self.metadata = []
     
-    def _load_metadata(self):
-        """Load metadata associated with vectors."""
-        metadata_path = f"{self.index_path}.metadata.json"
-        if os.path.exists(metadata_path):
-            with open(metadata_path, 'r') as f:
-                self.metadata = json.load(f)
-    
-    def _save_metadata(self):
-        """Save metadata associated with vectors."""
-        metadata_path = f"{self.index_path}.metadata.json"
-        with open(metadata_path, 'w') as f:
-            json.dump(self.metadata, f)
-    
-    def add_documents(self, embeddings: np.ndarray, metadata: List[Dict]):
+    def add_documents(self, chunks: List[Dict]):
         """
-        Add documents to the vector database.
+        Add document chunks to the vector database.
         
         Args:
-            embeddings: numpy array of embeddings (n x dimension)
-            metadata: List of metadata dicts for each embedding
+            chunks: List of dictionaries with "text" and "metadata" keys
+                   Format: [{"text": "...", "metadata": {...}}, ...]
         """
-        if self.index.ntotal == 0:
-            self.index.add(embeddings.astype('float32'))
-        else:
-            self.index.add(embeddings.astype('float32'))
+        if not chunks:
+            return
         
-        self.metadata.extend(metadata)
-        self._save_metadata()
-        self._save_index()
+        # Extract texts and metadata
+        texts = [chunk["text"] for chunk in chunks]
+        metadata_list = [chunk["metadata"] for chunk in chunks]
+        
+        # Generate embeddings
+        embeddings = self.embedding_generator.get_embeddings(texts)
+        
+        if embeddings.size == 0:
+            return
+        
+        # Add to FAISS index
+        self.index.add(embeddings.astype('float32'))
+        
+        # Store metadata (including text for retrieval)
+        for i, chunk in enumerate(chunks):
+            metadata_with_text = {
+                "text": chunk["text"],
+                **chunk["metadata"]
+            }
+            self.metadata.append(metadata_with_text)
+        
+        # Auto-save after adding
+        self.persist()
     
-    def _save_index(self):
-        """Save FAISS index to disk."""
-        faiss.write_index(self.index, f"{self.index_path}.index")
-    
-    def search(self, query_embedding: np.ndarray, k: int = 5) -> List[Tuple[Dict, float]]:
+    def search(self, query: str, k: int = 5) -> List[Dict]:
         """
         Search for similar documents.
         
         Args:
-            query_embedding: Query embedding vector
+            query: Query text string
             k: Number of results to return
             
         Returns:
-            List of tuples (metadata, distance)
+            List of dictionaries with "text", "metadata", and "score" keys
         """
-        if self.index.ntotal == 0:
+        if self.index is None or self.index.ntotal == 0:
             return []
         
+        # Generate query embedding
+        query_embedding = self.embedding_generator.get_embedding(query)
         query_embedding = query_embedding.reshape(1, -1).astype('float32')
+        
+        # Search in FAISS
         distances, indices = self.index.search(query_embedding, k)
         
         results = []
         for idx, dist in zip(indices[0], distances[0]):
-            if idx < len(self.metadata):
-                results.append((self.metadata[idx], float(dist)))
+            if idx < len(self.metadata) and idx >= 0:
+                metadata = self.metadata[idx].copy()
+                text = metadata.pop("text", "")
+                
+                results.append({
+                    "text": text,
+                    "metadata": metadata,
+                    "score": float(dist)
+                })
         
         return results
+    
+    def persist(self):
+        """Persist the vector database to disk."""
+        if self.index is None:
+            return
+        
+        # Save FAISS index
+        index_file = f"{self.index_path}.index"
+        faiss.write_index(self.index, index_file)
+        
+        # Save metadata
+        metadata_file = f"{self.index_path}.metadata.json"
+        with open(metadata_file, 'w', encoding='utf-8') as f:
+            json.dump(self.metadata, f, ensure_ascii=False, indent=2)
+    
+    def load(self):
+        """Load the vector database from disk."""
+        index_file = f"{self.index_path}.index"
+        metadata_file = f"{self.index_path}.metadata.json"
+        
+        if not os.path.exists(index_file):
+            raise FileNotFoundError(f"Index file not found: {index_file}")
+        
+        # Load FAISS index
+        self.index = faiss.read_index(index_file)
+        
+        # Load metadata
+        if os.path.exists(metadata_file):
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                self.metadata = json.load(f)
+        else:
+            self.metadata = []
     
     def get_stats(self) -> Dict:
         """Get statistics about the vector database."""
         return {
-            "total_documents": self.index.ntotal,
+            "total_documents": self.index.ntotal if self.index else 0,
             "dimension": self.dimension,
-            "index_path": self.index_path
+            "index_path": self.index_path,
+            "model": self.embedding_generator.model_name
         }
-

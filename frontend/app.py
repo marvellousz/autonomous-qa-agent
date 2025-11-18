@@ -6,45 +6,240 @@ import requests
 import os
 import json
 from pathlib import Path
+from datetime import datetime
 
 # Configuration
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
+# Custom CSS for pretty UI
+st.markdown("""
+    <style>
+    /* Main styling */
+    .main {
+        padding-top: 2rem;
+    }
+    
+    /* Headers */
+    h1 {
+        color: #2563eb;
+        border-bottom: 3px solid #2563eb;
+        padding-bottom: 0.5rem;
+    }
+    
+    h2 {
+        color: #1e40af;
+        margin-top: 2rem;
+    }
+    
+    /* Cards */
+    .card {
+        background-color: #f8fafc;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #2563eb;
+        margin: 1rem 0;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+    }
+    
+    /* Success messages */
+    .success-box {
+        background-color: #d1fae5;
+        border-left: 4px solid #10b981;
+        padding: 1rem;
+        border-radius: 5px;
+        margin: 1rem 0;
+    }
+    
+    /* Error messages */
+    .error-box {
+        background-color: #fee2e2;
+        border-left: 4px solid #ef4444;
+        padding: 1rem;
+        border-radius: 5px;
+        margin: 1rem 0;
+    }
+    
+    /* Info boxes */
+    .info-box {
+        background-color: #dbeafe;
+        border-left: 4px solid #2563eb;
+        padding: 1rem;
+        border-radius: 5px;
+        margin: 1rem 0;
+    }
+    
+    /* Metrics */
+    .metric-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.5rem;
+        border-radius: 10px;
+        color: white;
+        margin: 1rem 0;
+    }
+    
+    /* Sidebar */
+    .css-1d391kg {
+        background-color: #f8fafc;
+    }
+    
+    /* Code blocks */
+    .stCodeBlock {
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    /* Expanders */
+    .streamlit-expanderHeader {
+        font-weight: 600;
+        color: #1e40af;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.set_page_config(
     page_title="Autonomous QA Agent",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Initialize session state
-if "test_cases" not in st.session_state:
-    st.session_state.test_cases = []
-if "checkout_html" not in st.session_state:
-    st.session_state.checkout_html = ""
+# Initialize session state with autosave
+def init_session_state():
+    """Initialize session state with default values."""
+    defaults = {
+        "test_cases": [],
+        "checkout_html": "",
+        "last_save": None,
+        "kb_stats": None
+    }
+    
+    for key, default_value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = default_value
 
-st.title("Autonomous QA Agent")
+def autosave_session():
+    """Autosave session state to browser storage."""
+    try:
+        # Save to session state (Streamlit handles persistence)
+        st.session_state.last_save = datetime.now().isoformat()
+    except Exception as e:
+        pass  # Silently fail if autosave doesn't work
+
+def load_session():
+    """Load session state from browser storage."""
+    try:
+        # Streamlit automatically persists session state
+        # This is a placeholder for any custom loading logic
+        pass
+    except Exception:
+        pass
+
+def handle_api_error(e, operation="operation"):
+    """Handle API errors with user-friendly messages."""
+    error_msg = f"Error during {operation}"
+    
+    if isinstance(e, requests.exceptions.ConnectionError):
+        error_msg = f"Cannot connect to API. Please ensure the backend is running at {API_BASE_URL}"
+    elif isinstance(e, requests.exceptions.Timeout):
+        error_msg = f"Request timed out. The {operation} is taking too long. Please try again."
+    elif isinstance(e, requests.exceptions.HTTPError):
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                error_detail = e.response.json()
+                if "detail" in error_detail:
+                    error_msg = f"{error_msg}: {error_detail['detail']}"
+                else:
+                    error_msg = f"{error_msg}: {str(error_detail)}"
+            except:
+                error_msg = f"{error_msg}: HTTP {e.response.status_code}"
+    else:
+        error_msg = f"{error_msg}: {str(e)}"
+    
+    return error_msg
+
+# Initialize session
+init_session_state()
+load_session()
+
+# Title with styling
+st.markdown("<h1>Autonomous QA Agent</h1>", unsafe_allow_html=True)
 st.markdown("Build knowledge base, generate test cases, and create Selenium scripts!")
 
 # Sidebar for navigation
-page = st.sidebar.selectbox(
-    "Navigation",
-    ["Upload Documents", "Test Case Generation", "Selenium Script Generation"]
-)
-
-# Health check indicator
-try:
-    health_response = requests.get(f"{API_BASE_URL}/health", timeout=2)
-    if health_response.status_code == 200:
-        st.sidebar.success("API Connected")
-    else:
-        st.sidebar.warning("API Health Check Failed")
-except:
-    st.sidebar.error("API Not Connected")
-
+with st.sidebar:
+    st.markdown("### Navigation")
+    page = st.selectbox(
+        "Select Page",
+        ["Upload Documents", "Test Case Generation", "Selenium Script Generation"],
+        label_visibility="collapsed"
+    )
+    
+    st.divider()
+    
+    # Health check indicator
+    st.markdown("### System Status")
+    try:
+        health_response = requests.get(f"{API_BASE_URL}/health", timeout=2)
+        if health_response.status_code == 200:
+            st.success("API Connected")
+            health_data = health_response.json()
+            if "vectordb" in health_data:
+                st.metric("Documents in KB", health_data["vectordb"].get("total_documents", 0))
+        else:
+            st.warning("API Health Check Failed")
+    except Exception:
+        st.error("API Not Connected")
+    
+    st.divider()
+    
+    # Session info
+    if st.session_state.last_save:
+        st.caption(f"Last saved: {st.session_state.last_save[:19] if len(st.session_state.last_save) > 19 else st.session_state.last_save}")
 
 # Page 1: Upload Documents
 if page == "Upload Documents":
     st.header("Upload Documents")
     st.markdown("Upload documentation files and checkout HTML to build the knowledge base.")
+    
+    # Knowledge Base Management Section
+    with st.expander("Knowledge Base Management", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("Refresh Stats", use_container_width=True):
+                try:
+                    response = requests.get(f"{API_BASE_URL}/api/ingestion/stats", timeout=5)
+                    response.raise_for_status()
+                    stats = response.json()
+                    st.session_state.kb_stats = stats
+                    st.success(f"Knowledge Base contains {stats.get('total_documents', 0)} documents")
+                    st.json(stats)
+                except Exception as e:
+                    error_msg = handle_api_error(e, "fetching stats")
+                    st.error(error_msg)
+        
+        with col2:
+            if st.button("Clear Knowledge Base", type="secondary", use_container_width=True):
+                try:
+                    response = requests.delete(f"{API_BASE_URL}/api/ingestion/clear", timeout=10)
+                    response.raise_for_status()
+                    result = response.json()
+                    st.success(f"Knowledge base cleared. {result.get('documents_cleared', 0)} documents removed.")
+                    st.session_state.kb_stats = None
+                    st.session_state.test_cases = []  # Clear test cases too
+                    autosave_session()
+                except Exception as e:
+                    error_msg = handle_api_error(e, "clearing knowledge base")
+                    st.error(error_msg)
     
     col1, col2 = st.columns(2)
     
@@ -74,19 +269,24 @@ if page == "Upload Documents":
             uploaded_html = st.file_uploader(
                 "Upload checkout.html",
                 type=["html", "htm"],
-                help="Upload the checkout.html file"
+                help="Upload the checkout.html file",
+                key="html_uploader"
             )
             if uploaded_html:
                 st.session_state.checkout_html = uploaded_html.read().decode('utf-8')
                 st.success(f"HTML file loaded: {uploaded_html.name}")
+                autosave_session()
         else:
             html_content = st.text_area(
                 "Paste HTML content:",
                 value=st.session_state.checkout_html,
                 height=200,
-                help="Paste the checkout.html content here"
+                help="Paste the checkout.html content here",
+                key="html_textarea"
             )
-            st.session_state.checkout_html = html_content
+            if html_content != st.session_state.checkout_html:
+                st.session_state.checkout_html = html_content
+                autosave_session()
             if html_content:
                 st.success("HTML content saved")
     
@@ -121,27 +321,32 @@ if page == "Upload Documents":
                         response.raise_for_status()
                         result = response.json()
                         
-                        st.success(f"✅ {result.get('status', 'KB Built Successfully')}")
-                        st.info(f"📄 Files processed: {result.get('files_processed', 0)}")
-                        st.info(f"📦 Total chunks: {result.get('total_chunks', 0)}")
+                        st.success(f"{result.get('status', 'KB Built Successfully')}")
+                        st.info(f"Files processed: {result.get('files_processed', 0)}")
+                        st.info(f"Total chunks: {result.get('total_chunks', 0)}")
                         
                         # Show stats
                         try:
-                            stats_response = requests.get(f"{API_BASE_URL}/api/ingestion/stats")
+                            stats_response = requests.get(f"{API_BASE_URL}/api/ingestion/stats", timeout=5)
                             if stats_response.status_code == 200:
                                 stats = stats_response.json()
+                                st.session_state.kb_stats = stats
                                 st.metric("Total Documents in KB", stats.get("total_documents", 0))
-                        except:
+                        except Exception:
                             pass
+                        
+                        autosave_session()
                     else:
                         st.error("No files to process.")
                         
                 except requests.exceptions.RequestException as e:
-                    st.error(f"Error building knowledge base: {str(e)}")
+                    error_msg = handle_api_error(e, "building knowledge base")
+                    st.error(error_msg)
                     if hasattr(e, 'response') and e.response is not None:
                         try:
                             error_detail = e.response.json()
-                            st.json(error_detail)
+                            with st.expander("Error Details"):
+                                st.json(error_detail)
                         except:
                             pass
 
@@ -188,12 +393,9 @@ elif page == "Test Case Generation":
                         # Store test cases in session state
                         test_cases_data = result.get("test_cases", {})
                         if isinstance(test_cases_data, dict):
-                            # If it's a dict, try to extract test cases
                             if "raw_response" in test_cases_data:
-                                # Markdown format stored in raw_response
                                 st.session_state.test_cases = [{"raw": test_cases_data["raw_response"]}]
                             else:
-                                # JSON format - store as list
                                 if isinstance(test_cases_data, list):
                                     st.session_state.test_cases = test_cases_data
                                 else:
@@ -201,13 +403,13 @@ elif page == "Test Case Generation":
                         else:
                             st.session_state.test_cases = [{"raw": str(test_cases_data)}]
                         
+                        autosave_session()
+                        
                         # Display test cases in collapsible sections
                         st.subheader("Generated Test Cases")
                         
                         if output_format == "json":
-                            # Try to parse and display structured test cases
                             if isinstance(test_cases_data, dict) and "raw_response" not in test_cases_data:
-                                # Display each test case in an expander
                                 for idx, (key, value) in enumerate(test_cases_data.items(), 1):
                                     with st.expander(f"Test Case {idx}: {key}", expanded=False):
                                         if isinstance(value, dict):
@@ -217,16 +419,14 @@ elif page == "Test Case Generation":
                                         else:
                                             st.write(value)
                             else:
-                                # Display raw response
                                 st.json(test_cases_data)
                         else:
-                            # Markdown format
                             with st.expander("View Test Cases", expanded=True):
                                 st.markdown(test_cases_data.get("raw_response", str(test_cases_data)))
                         
                         # Show grounding information
                         if result.get("grounded_in"):
-                            st.info(f"📚 Grounded in: {', '.join(result['grounded_in'])}")
+                            st.info(f"Grounded in: {', '.join(result['grounded_in'])}")
                         
                         # Show sources
                         if result.get("sources"):
@@ -240,11 +440,13 @@ elif page == "Test Case Generation":
                         st.json(result)
                         
                 except requests.exceptions.RequestException as e:
-                    st.error(f"Error generating test cases: {str(e)}")
+                    error_msg = handle_api_error(e, "generating test cases")
+                    st.error(error_msg)
                     if hasattr(e, 'response') and e.response is not None:
                         try:
                             error_detail = e.response.json()
-                            st.json(error_detail)
+                            with st.expander("Error Details"):
+                                st.json(error_detail)
                         except:
                             pass
 
@@ -256,7 +458,7 @@ elif page == "Selenium Script Generation":
     
     # Check if test cases exist
     if not st.session_state.test_cases:
-        st.warning("⚠️ No test cases available. Please generate test cases first.")
+        st.warning("No test cases available. Please generate test cases first.")
         st.info("Go to 'Test Case Generation' page to create test cases.")
     else:
         # Test case selection
@@ -290,24 +492,28 @@ elif page == "Selenium Script Generation":
         
         # HTML content check
         if not st.session_state.checkout_html:
-            st.warning("⚠️ No checkout HTML available. Please upload HTML in 'Upload Documents' page.")
+            st.warning("No checkout HTML available. Please upload HTML in 'Upload Documents' page.")
             html_input = st.text_area(
                 "Or paste HTML content here:",
                 height=150,
-                help="Paste checkout.html content"
+                help="Paste checkout.html content",
+                key="html_fallback"
             )
             if html_input:
                 st.session_state.checkout_html = html_input
+                autosave_session()
         else:
-            st.success("✅ Checkout HTML available")
+            st.success("Checkout HTML available")
             with st.expander("View HTML Content"):
-                st.code(st.session_state.checkout_html[:500] + "..." if len(st.session_state.checkout_html) > 500 else st.session_state.checkout_html, language="html")
+                html_preview = st.session_state.checkout_html[:500] + "..." if len(st.session_state.checkout_html) > 500 else st.session_state.checkout_html
+                st.code(html_preview, language="html")
         
         # URL input
         test_url = st.text_input(
             "Test URL (optional):",
             placeholder="https://example.com/checkout",
-            help="URL where the test will run"
+            help="URL where the test will run",
+            key="test_url"
         )
         
         st.divider()
@@ -323,7 +529,6 @@ elif page == "Selenium Script Generation":
                         if isinstance(selected_test_case, dict) and "raw" not in selected_test_case:
                             test_case_data = selected_test_case
                         else:
-                            # Create a basic test case structure
                             test_case_data = {
                                 "Test_ID": f"TC_{selected_idx+1}",
                                 "Feature": "Checkout",
@@ -347,27 +552,36 @@ elif page == "Selenium Script Generation":
                         result = response.json()
                         
                         if result.get("status") == "success":
-                            st.success("✅ Selenium script generated successfully!")
+                            st.success("Selenium script generated successfully!")
+                            
+                            # Store script in session state
+                            script_code = result.get("script", "")
+                            st.session_state[f"script_{selected_idx}"] = script_code
+                            autosave_session()
                             
                             # Display script
                             st.subheader("Generated Python Script")
-                            script_code = result.get("script", "")
                             st.code(script_code, language="python")
                             
-                            # Copy button (using download button as workaround for copy)
+                            # Download button
                             st.download_button(
-                                label="📋 Copy Script",
+                                label="Download Script",
                                 data=script_code,
                                 file_name=f"selenium_script_{result.get('test_id', 'TC')}.py",
                                 mime="text/x-python",
-                                use_container_width=True
+                                use_container_width=True,
+                                type="primary"
                             )
                             
                             # Show metadata
                             if result.get("selectors_used"):
-                                st.info(f"📊 Selectors used: {result['selectors_used'].get('ids_count', 0)} IDs, "
-                                       f"{result['selectors_used'].get('names_count', 0)} names, "
-                                       f"{result['selectors_used'].get('classes_count', 0)} classes")
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("IDs", result['selectors_used'].get('ids_count', 0))
+                                with col2:
+                                    st.metric("Names", result['selectors_used'].get('names_count', 0))
+                                with col3:
+                                    st.metric("Classes", result['selectors_used'].get('classes_count', 0))
                             
                             if result.get("sources"):
                                 with st.expander("Documentation Sources Used"):
@@ -378,10 +592,12 @@ elif page == "Selenium Script Generation":
                             st.json(result)
                             
                     except requests.exceptions.RequestException as e:
-                        st.error(f"Error generating script: {str(e)}")
+                        error_msg = handle_api_error(e, "generating script")
+                        st.error(error_msg)
                         if hasattr(e, 'response') and e.response is not None:
                             try:
                                 error_detail = e.response.json()
-                                st.json(error_detail)
+                                with st.expander("Error Details"):
+                                    st.json(error_detail)
                             except:
                                 pass

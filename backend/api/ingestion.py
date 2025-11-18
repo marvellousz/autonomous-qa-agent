@@ -195,6 +195,54 @@ async def build_knowledge_base(files: List[UploadFile] = File(...)):
                     pass
 
 
+@router.delete("/clear")
+async def clear_knowledge_base():
+    """
+    Clear the entire knowledge base (vector database).
+    
+    Returns:
+        Status message
+    """
+    if rag_pipeline is None:
+        raise HTTPException(status_code=500, detail="RAG pipeline not initialized")
+    
+    try:
+        # Get stats before clearing
+        stats_before = rag_pipeline.vectordb.get_stats()
+        total_docs = stats_before.get("total_documents", 0)
+        
+        if total_docs == 0:
+            return {
+                "status": "success",
+                "message": "Knowledge base is already empty",
+                "documents_cleared": 0
+            }
+        
+        # Clear the vector database
+        index_path = rag_pipeline.vectordb.index_path
+        
+        # Remove index file
+        index_file = f"{index_path}.index"
+        if os.path.exists(index_file):
+            os.unlink(index_file)
+        
+        # Remove metadata file
+        metadata_file = f"{index_path}.metadata.json"
+        if os.path.exists(metadata_file):
+            os.unlink(metadata_file)
+        
+        # Reinitialize empty index
+        rag_pipeline.vectordb._initialize_index()
+        
+        return {
+            "status": "success",
+            "message": "Knowledge base cleared successfully",
+            "documents_cleared": total_docs
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clearing knowledge base: {str(e)}")
+
+
 @router.get("/stats")
 async def get_ingestion_stats():
     """

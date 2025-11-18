@@ -60,6 +60,8 @@ async def root():
         "endpoints": {
             "ingestion": "/api/ingestion",
             "build_kb": "/api/ingestion/build_kb",
+            "clear_kb": "/api/ingestion/clear",
+            "stats": "/api/ingestion/stats",
             "generation": "/api/generation",
             "generate_test_cases": "/api/generation/generate_test_cases",
             "generate_script": "/api/generation/generate_script",

@@ -114,6 +114,112 @@ st.markdown("""
         font-weight: 600;
         color: #1e40af;
     }
+    
+    /* Stepper Navigation Styles */
+    .stepper-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin: 1.5rem 0;
+    }
+    
+    .step-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        background: rgba(255, 255, 255, 0.05);
+        margin-bottom: 0.5rem;
+    }
+    
+    .step-item:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateX(4px);
+        border-color: rgba(102, 126, 234, 0.5);
+    }
+    
+    .step-item.clickable {
+        cursor: pointer;
+    }
+    
+    .step-item.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-color: #667eea;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .step-item.completed {
+        background: rgba(16, 185, 129, 0.1);
+        border-color: #10b981;
+    }
+    
+    .step-number {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.875rem;
+        margin-right: 0.75rem;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .step-item.active .step-number {
+        background: white;
+        color: #667eea;
+        border-color: white;
+    }
+    
+    .step-item.completed .step-number {
+        background: #10b981;
+        color: white;
+        border-color: #10b981;
+    }
+    
+    .step-content {
+        flex: 1;
+    }
+    
+    .step-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: white;
+        margin-bottom: 0.25rem;
+    }
+    
+    .step-item.active .step-title {
+        color: white;
+    }
+    
+    .step-description {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.7);
+        margin: 0;
+    }
+    
+    .step-item.active .step-description {
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .step-connector {
+        width: 2px;
+        height: 24px;
+        background: rgba(255, 255, 255, 0.1);
+        margin-left: 15px;
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .step-item.completed + .step-connector {
+        background: #10b981;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -124,7 +230,8 @@ def init_session_state():
         "test_cases": [],
         "checkout_html": "",
         "last_save": None,
-        "kb_stats": None
+        "kb_stats": None,
+        "current_step": 1
     }
     
     for key, default_value in defaults.items():
@@ -291,11 +398,84 @@ st.markdown("Build knowledge base, generate test cases, and create Selenium scri
 # Sidebar
 with st.sidebar:
     st.markdown("### Navigation")
-    page = st.selectbox(
-        "Select Page",
-        ["Upload Documents", "Test Case Generation", "Selenium Script Generation"],
-        label_visibility="collapsed"
-    )
+    
+    # Define steps
+    steps = [
+        {
+            "number": 1,
+            "title": "Upload Documents",
+            "description": "Build knowledge base"
+        },
+        {
+            "number": 2,
+            "title": "Test Case Generation",
+            "description": "Generate test cases"
+        },
+        {
+            "number": 3,
+            "title": "Selenium Script",
+            "description": "Create scripts"
+        }
+    ]
+    
+    # Render visual stepper with clickable buttons
+    for idx, step in enumerate(steps):
+        step_num = step["number"]
+        is_active = st.session_state.current_step == step_num
+        is_completed = st.session_state.current_step > step_num
+        
+        # Create button with step info
+        if is_completed:
+            button_text = f"✓ Step {step_num}: {step['title']}"
+        else:
+            button_text = f"{step_num}. {step['title']}"
+        
+        if st.button(
+            button_text,
+            key=f"nav_step_{step_num}",
+            use_container_width=True,
+            type="primary" if is_active else "secondary"
+        ):
+            st.session_state.current_step = step_num
+            st.rerun()
+        
+        # Show description below button
+        desc_text = step['description']
+        if is_active:
+            st.caption(f"📍 {desc_text}")
+        elif is_completed:
+            st.caption(f"✓ {desc_text}")
+        else:
+            st.caption(desc_text)
+        
+        # Add spacing between steps
+        if idx < len(steps) - 1:
+            st.markdown("<br>", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Navigation arrows - always show both buttons for consistent sizing
+    nav_col1, nav_col2 = st.columns(2)
+    with nav_col1:
+        prev_enabled = st.session_state.current_step > 1
+        if st.button("◄ Prev", key="prev_step", use_container_width=True, disabled=not prev_enabled):
+            if prev_enabled:
+                st.session_state.current_step -= 1
+                st.rerun()
+    with nav_col2:
+        next_enabled = st.session_state.current_step < len(steps)
+        if st.button("Next ►", key="next_step", use_container_width=True, disabled=not next_enabled):
+            if next_enabled:
+                st.session_state.current_step += 1
+                st.rerun()
+    
+    # Map step to page name for compatibility
+    page_map = {
+        1: "Upload Documents",
+        2: "Test Case Generation",
+        3: "Selenium Script Generation"
+    }
+    page = page_map.get(st.session_state.current_step, "Upload Documents")
     
     st.divider()
     
@@ -355,54 +535,57 @@ if page == "Upload Documents":
                     error_msg = handle_api_error(e, "clearing knowledge base")
                     st.error(error_msg)
     
-    col1, col2 = st.columns(2)
+    # Documentation Files section (first)
+    st.subheader("Documentation Files")
+    uploaded_docs = st.file_uploader(
+        "Upload documentation files",
+        type=["pdf", "txt", "md", "json"],
+        accept_multiple_files=True,
+        help="Upload PDF, TXT, MD, or JSON files",
+        label_visibility="collapsed"
+    )
     
-    with col1:
-        st.subheader("Documentation Files")
-        uploaded_docs = st.file_uploader(
-            "Upload documentation files",
-            type=["pdf", "txt", "md", "json"],
-            accept_multiple_files=True,
-            help="Upload PDF, TXT, MD, or JSON files"
-        )
-        
-        if uploaded_docs:
-            st.info(f"{len(uploaded_docs)} file(s) selected")
-            for doc in uploaded_docs:
-                st.write(f"- {doc.name}")
+    if uploaded_docs:
+        st.success(f"{len(uploaded_docs)} file(s) selected")
+        for doc in uploaded_docs:
+            st.markdown(f"**{doc.name}**")
+    else:
+        st.info("Upload your documentation files here")
     
-    with col2:
-        st.subheader("Checkout HTML")
-        html_option = st.radio(
-            "Choose input method:",
-            ["Upload HTML file", "Paste HTML content"],
-            key="html_input_method"
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Checkout HTML section (second)
+    st.subheader("Checkout HTML")
+    html_option = st.radio(
+        "Choose input method:",
+        ["Upload HTML file", "Paste HTML content"],
+        key="html_input_method"
+    )
+    
+    if html_option == "Upload HTML file":
+        uploaded_html = st.file_uploader(
+            "Upload checkout.html",
+            type=["html", "htm"],
+            help="Upload the checkout.html file",
+            key="html_uploader"
         )
-        
-        if html_option == "Upload HTML file":
-            uploaded_html = st.file_uploader(
-                "Upload checkout.html",
-                type=["html", "htm"],
-                help="Upload the checkout.html file",
-                key="html_uploader"
-            )
-            if uploaded_html:
-                st.session_state.checkout_html = uploaded_html.read().decode('utf-8')
-                st.success(f"HTML file loaded: {uploaded_html.name}")
-                autosave_session()
-        else:
-            html_content = st.text_area(
-                "Paste HTML content:",
-                value=st.session_state.checkout_html,
-                height=200,
-                help="Paste the checkout.html content here",
-                key="html_textarea"
-            )
-            if html_content != st.session_state.checkout_html:
-                st.session_state.checkout_html = html_content
-                autosave_session()
-            if html_content:
-                st.success("HTML content saved")
+        if uploaded_html:
+            st.session_state.checkout_html = uploaded_html.read().decode('utf-8')
+            st.success(f"HTML file loaded: {uploaded_html.name}")
+            autosave_session()
+    else:
+        html_content = st.text_area(
+            "Paste HTML content:",
+            value=st.session_state.checkout_html,
+            height=200,
+            help="Paste the checkout.html content here",
+            key="html_textarea"
+        )
+        if html_content != st.session_state.checkout_html:
+            st.session_state.checkout_html = html_content
+            autosave_session()
+        if html_content:
+            st.success("HTML content saved")
     
     st.divider()
     

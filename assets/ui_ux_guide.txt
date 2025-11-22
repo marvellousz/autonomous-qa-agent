@@ -82,6 +82,12 @@ Button States:
   - Active: Scale down (0.98)
   - Disabled: 50% opacity, cursor not-allowed
 
+Checkout Button:
+  - The 'Pay Now' button should be green (or primary color)
+  - Used for final order submission
+  - Full width on mobile, centered on desktop
+  - Large size (18px font, 16px padding vertical)
+
 FORM ELEMENTS
 -------------
 Input Fields:
@@ -148,6 +154,7 @@ Form Sections:
      - "Complete Order" button at bottom
 
 Form Validation:
+  - Form validation errors must be displayed in red text
   - Real-time validation on blur
   - Error messages appear below fields
   - Submit button disabled until all required fields valid

@@ -1,17 +1,28 @@
 """
-Streamlit UI for Autonomous QA Agent.
+Streamlit UI for QA agent.
 """
 import streamlit as st
 import requests
 import os
 import json
+import re
 from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
 
-# Configuration
+load_dotenv()
+
+# Page config must be first
+st.set_page_config(
+    page_title="Autonomous QA Agent",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Config
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
-# Custom CSS for pretty UI
+# Custom CSS
 st.markdown("""
     <style>
     /* Main styling */
@@ -106,15 +117,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.set_page_config(
-    page_title="Autonomous QA Agent",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Initialize session state with autosave
+# Init session state
 def init_session_state():
-    """Initialize session state with default values."""
+    """Init session state."""
     defaults = {
         "test_cases": [],
         "checkout_html": "",
@@ -125,26 +130,135 @@ def init_session_state():
     for key, default_value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = default_value
+    
+    # Auto-load checkout.html if exists
+    if not st.session_state.checkout_html:
+        assets_path = Path(__file__).parent.parent / "assets" / "checkout.html"
+        if assets_path.exists():
+            try:
+                with open(assets_path, 'r', encoding='utf-8') as f:
+                    st.session_state.checkout_html = f.read()
+            except Exception:
+                pass
 
 def autosave_session():
-    """Autosave session state to browser storage."""
+    """Autosave session."""
     try:
-        # Save to session state (Streamlit handles persistence)
         st.session_state.last_save = datetime.now().isoformat()
     except Exception as e:
-        pass  # Silently fail if autosave doesn't work
+        pass
 
 def load_session():
-    """Load session state from browser storage."""
+    """Load session."""
     try:
-        # Streamlit automatically persists session state
-        # This is a placeholder for any custom loading logic
         pass
     except Exception:
         pass
 
+def parse_markdown_test_cases(markdown_text: str) -> list:
+    """Parse markdown test cases to list of dicts."""
+    if not markdown_text or not isinstance(markdown_text, str):
+        return []
+    
+    try:
+        test_cases = []
+        current_case = {}
+        current_field = None
+        steps_list = []
+        
+        lines = markdown_text.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Parse Test_ID
+            if line.startswith('Test_ID:') or line.startswith('**Test_ID:**'):
+                if current_case:
+                    if steps_list:
+                        current_case['Steps'] = steps_list
+                    test_cases.append(current_case)
+                current_case = {}
+                steps_list = []
+                parts = re.split(r':\s*', line, 1)
+                if len(parts) > 1:
+                    test_id = parts[1].strip()
+                    test_id = re.sub(r'\*\*', '', test_id)
+                    current_case['Test_ID'] = test_id
+                else:
+                    current_case['Test_ID'] = f"TC-{len(test_cases) + 1:03d}"
+            
+            # Parse Feature
+            elif line.startswith('Feature:') or line.startswith('**Feature:**'):
+                parts = re.split(r':\s*', line, 1)
+                if len(parts) > 1:
+                    feature = parts[1].strip()
+                    feature = re.sub(r'\*\*', '', feature)
+                    current_case['Feature'] = feature
+            
+            # Parse Scenario
+            elif line.startswith('Scenario:') or line.startswith('**Scenario:**'):
+                parts = re.split(r':\s*', line, 1)
+                if len(parts) > 1:
+                    scenario = parts[1].strip()
+                    scenario = re.sub(r'\*\*', '', scenario)
+                    current_case['Scenario'] = scenario
+            
+            # Parse Steps
+            elif line.lower().startswith('steps:') or line.startswith('**Steps:**'):
+                current_field = 'steps'
+                steps_list = []
+            
+            # Parse Expected_Result
+            elif line.startswith('Expected Result:') or line.startswith('Expected_Result:') or line.startswith('**Expected Result:**') or line.startswith('**Expected_Result:**'):
+                if steps_list:
+                    current_case['Steps'] = steps_list
+                    steps_list = []
+                parts = re.split(r':\s*', line, 1)
+                if len(parts) > 1:
+                    expected = parts[1].strip()
+                    expected = re.sub(r'\*\*', '', expected)
+                    current_case['Expected_Result'] = expected
+                current_field = None
+            
+            # Parse Grounded_In
+            elif line.startswith('Grounded In:') or line.startswith('Grounded_In:') or line.startswith('**Grounded In:**') or line.startswith('**Grounded_In:**'):
+                parts = re.split(r':\s*', line, 1)
+                if len(parts) > 1:
+                    grounded = parts[1].strip()
+                    grounded = re.sub(r'\*\*', '', grounded)
+                    current_case['Grounded_In'] = grounded
+            
+            # Collect steps
+            elif current_field == 'steps':
+                # Match numbered steps or bullets
+                if (re.match(r'^\d+\.', line) or line.startswith(('-', '*'))):
+                    step_text = re.sub(r'^\d+\.\s*', '', line)
+                    step_text = re.sub(r'^[-*]\s*', '', step_text)
+                    step_text = re.sub(r'\*\*', '', step_text)
+                    if step_text.strip():
+                        steps_list.append(step_text.strip())
+        
+        # Add last test case
+        if current_case:
+            if steps_list:
+                current_case['Steps'] = steps_list
+            # Ensure required fields
+            if 'Test_ID' not in current_case:
+                current_case['Test_ID'] = f"TC-{len(test_cases) + 1:03d}"
+            if 'Steps' not in current_case:
+                current_case['Steps'] = []
+            test_cases.append(current_case)
+        
+        return test_cases if test_cases else []
+    
+    except Exception as e:
+        print(f"Error parsing markdown test cases: {str(e)}")
+        return []
+
 def handle_api_error(e, operation="operation"):
-    """Handle API errors with user-friendly messages."""
+    """Handle API errors."""
     error_msg = f"Error during {operation}"
     
     if isinstance(e, requests.exceptions.ConnectionError):
@@ -166,15 +280,15 @@ def handle_api_error(e, operation="operation"):
     
     return error_msg
 
-# Initialize session
+# Init session
 init_session_state()
 load_session()
 
-# Title with styling
+# Title
 st.markdown("<h1>Autonomous QA Agent</h1>", unsafe_allow_html=True)
 st.markdown("Build knowledge base, generate test cases, and create Selenium scripts!")
 
-# Sidebar for navigation
+# Sidebar
 with st.sidebar:
     st.markdown("### Navigation")
     page = st.selectbox(
@@ -185,7 +299,7 @@ with st.sidebar:
     
     st.divider()
     
-    # Health check indicator
+    # Health check
     st.markdown("### System Status")
     try:
         health_response = requests.get(f"{API_BASE_URL}/health", timeout=2)
@@ -205,7 +319,7 @@ with st.sidebar:
     if st.session_state.last_save:
         st.caption(f"Last saved: {st.session_state.last_save[:19] if len(st.session_state.last_save) > 19 else st.session_state.last_save}")
 
-# Page 1: Upload Documents
+# Upload Documents page
 if page == "Upload Documents":
     st.header("Upload Documents")
     st.markdown("Upload documentation files and checkout HTML to build the knowledge base.")
@@ -292,22 +406,38 @@ if page == "Upload Documents":
     
     st.divider()
     
-    # Build Knowledge Base button
+    # Clear KB option
+    clear_before_build = st.checkbox(
+        "Clear existing knowledge base before building",
+        value=True,
+        help="If checked, existing documents will be cleared before adding new ones. Uncheck to append to existing KB."
+    )
+    
+    # Build KB button
     if st.button("Build Knowledge Base", type="primary", use_container_width=True):
         if not uploaded_docs and not st.session_state.checkout_html:
             st.error("Please upload at least one document or provide HTML content.")
         else:
             with st.spinner("Building knowledge base..."):
                 try:
+                    # Clear KB if requested
+                    if clear_before_build:
+                        try:
+                            clear_response = requests.delete(f"{API_BASE_URL}/api/ingestion/clear", timeout=10)
+                            if clear_response.status_code == 200:
+                                st.info("Cleared existing knowledge base")
+                        except Exception as e:
+                            st.warning(f"Could not clear existing KB: {str(e)}. Continuing with append...")
+                    
                     files_data = []
                     
-                    # Add documentation files
+                    # Add docs
                     if uploaded_docs:
                         for uploaded_file in uploaded_docs:
                             files_data.append(("files", (uploaded_file.name, uploaded_file.read(), uploaded_file.type)))
                             uploaded_file.seek(0)
                     
-                    # Add HTML file if provided
+                    # Add HTML
                     if st.session_state.checkout_html:
                         html_bytes = st.session_state.checkout_html.encode('utf-8')
                         files_data.append(("files", ("checkout.html", html_bytes, "text/html")))
@@ -351,7 +481,7 @@ if page == "Upload Documents":
                             pass
 
 
-# Page 2: Test Case Generation
+# Test Case Generation page
 elif page == "Test Case Generation":
     st.header("Test Case Generation")
     st.markdown("Enter a feature description to generate test cases based on your knowledge base.")
@@ -392,37 +522,104 @@ elif page == "Test Case Generation":
                         
                         # Store test cases in session state
                         test_cases_data = result.get("test_cases", {})
-                        if isinstance(test_cases_data, dict):
+                        if isinstance(test_cases_data, list):
+                            # Direct list of test cases (most common case for JSON format)
+                            st.session_state.test_cases = test_cases_data
+                        elif isinstance(test_cases_data, dict):
                             if "raw_response" in test_cases_data:
-                                st.session_state.test_cases = [{"raw": test_cases_data["raw_response"]}]
-                            else:
-                                if isinstance(test_cases_data, list):
-                                    st.session_state.test_cases = test_cases_data
+                                # Try to parse markdown test cases from raw_response
+                                parsed = parse_markdown_test_cases(test_cases_data["raw_response"])
+                                if parsed:
+                                    st.session_state.test_cases = parsed
                                 else:
-                                    st.session_state.test_cases = [test_cases_data]
+                                    # If parsing fails, store as raw
+                                    st.session_state.test_cases = [{"raw": test_cases_data["raw_response"]}]
+                            else:
+                                # Single test case dict, wrap in list
+                                st.session_state.test_cases = [test_cases_data]
+                        elif isinstance(test_cases_data, str):
+                            # Markdown format string - try to parse it
+                            parsed = parse_markdown_test_cases(test_cases_data)
+                            if parsed:
+                                st.session_state.test_cases = parsed
+                            else:
+                                # If parsing fails, store as raw
+                                st.session_state.test_cases = [{"raw": test_cases_data}]
                         else:
-                            st.session_state.test_cases = [{"raw": str(test_cases_data)}]
+                            # Fallback: treat as raw string/markdown
+                            markdown_str = str(test_cases_data)
+                            parsed = parse_markdown_test_cases(markdown_str)
+                            if parsed:
+                                st.session_state.test_cases = parsed
+                            else:
+                                st.session_state.test_cases = [{"raw": markdown_str}]
                         
                         autosave_session()
                         
-                        # Display test cases in collapsible sections
+                        # Display test cases
                         st.subheader("Generated Test Cases")
                         
                         if output_format == "json":
-                            if isinstance(test_cases_data, dict) and "raw_response" not in test_cases_data:
-                                for idx, (key, value) in enumerate(test_cases_data.items(), 1):
-                                    with st.expander(f"Test Case {idx}: {key}", expanded=False):
-                                        if isinstance(value, dict):
-                                            for field, content in value.items():
-                                                st.write(f"**{field}:**")
-                                                st.write(content)
+                            # Handle list of test cases
+                            if isinstance(test_cases_data, list):
+                                for idx, test_case in enumerate(test_cases_data, 1):
+                                    test_id = test_case.get("Test_ID", f"TC-{idx}") if isinstance(test_case, dict) else f"TC-{idx}"
+                                    with st.expander(f"Test Case {idx}: {test_id}", expanded=False):
+                                        if isinstance(test_case, dict):
+                                            for field, content in test_case.items():
+                                                if field == "Steps" and isinstance(content, list):
+                                                    st.write(f"**{field}:**")
+                                                    for step_idx, step in enumerate(content, 1):
+                                                        st.write(f"{step_idx}. {step}")
+                                                else:
+                                                    st.write(f"**{field}:** {content}")
                                         else:
-                                            st.write(value)
+                                            st.write(test_case)
+                            # Handle dict with raw_response
+                            elif isinstance(test_cases_data, dict):
+                                if "raw_response" in test_cases_data:
+                                    # Try to parse markdown from raw_response
+                                    parsed = parse_markdown_test_cases(test_cases_data["raw_response"])
+                                    if parsed:
+                                        for idx, test_case in enumerate(parsed, 1):
+                                            test_id = test_case.get("Test_ID", f"TC-{idx}")
+                                            with st.expander(f"Test Case {idx}: {test_id}", expanded=False):
+                                                for field, content in test_case.items():
+                                                    if field == "Steps" and isinstance(content, list):
+                                                        st.write(f"**{field}:**")
+                                                        for step_idx, step in enumerate(content, 1):
+                                                            st.write(f"{step_idx}. {step}")
+                                                    else:
+                                                        st.write(f"**{field}:** {content}")
+                                    else:
+                                        st.markdown(test_cases_data["raw_response"])
+                                else:
+                                    # Single test case dict or other dict structure
+                                    for idx, (key, value) in enumerate(test_cases_data.items(), 1):
+                                        with st.expander(f"Test Case {idx}: {key}", expanded=False):
+                                            if isinstance(value, dict):
+                                                for field, content in value.items():
+                                                    st.write(f"**{field}:**")
+                                                    st.write(content)
+                                            else:
+                                                st.write(value)
                             else:
+                                # Fallback: display as JSON
                                 st.json(test_cases_data)
                         else:
+                            # Markdown format
                             with st.expander("View Test Cases", expanded=True):
-                                st.markdown(test_cases_data.get("raw_response", str(test_cases_data)))
+                                # Handle both string and dict responses
+                                if isinstance(test_cases_data, str):
+                                    st.markdown(test_cases_data)
+                                elif isinstance(test_cases_data, dict):
+                                    # Check if it's a dict with raw_response or just the markdown content
+                                    if "raw_response" in test_cases_data:
+                                        st.markdown(test_cases_data["raw_response"])
+                                    else:
+                                        st.markdown(str(test_cases_data))
+                                else:
+                                    st.markdown(str(test_cases_data))
                         
                         # Show grounding information
                         if result.get("grounded_in"):
@@ -451,7 +648,7 @@ elif page == "Test Case Generation":
                             pass
 
 
-# Page 3: Selenium Script Generation
+# Selenium Script Generation page
 elif page == "Selenium Script Generation":
     st.header("Selenium Script Generation")
     st.markdown("Select a test case and generate a runnable Selenium script.")
@@ -465,9 +662,14 @@ elif page == "Selenium Script Generation":
         test_case_options = []
         for idx, tc in enumerate(st.session_state.test_cases):
             if isinstance(tc, dict):
-                test_id = tc.get("Test_ID", f"TC_{idx+1}")
-                feature = tc.get("Feature", "Unknown Feature")
-                test_case_options.append(f"{test_id} - {feature}")
+                # Skip raw markdown
+                if "raw" in tc:
+                    test_case_options.append(f"Test Case {idx+1} (Markdown)")
+                else:
+                    # Try field variations
+                    test_id = tc.get("Test_ID") or tc.get("test_id") or f"TC_{idx+1}"
+                    feature = tc.get("Feature") or tc.get("feature") or "Unknown Feature"
+                    test_case_options.append(f"{test_id} - {feature}")
             else:
                 test_case_options.append(f"Test Case {idx+1}")
         
@@ -490,7 +692,7 @@ elif page == "Selenium Script Generation":
             else:
                 st.write(selected_test_case)
         
-        # HTML content check
+        # HTML check
         if not st.session_state.checkout_html:
             st.warning("No checkout HTML available. Please upload HTML in 'Upload Documents' page.")
             html_input = st.text_area(
@@ -525,7 +727,7 @@ elif page == "Selenium Script Generation":
             else:
                 with st.spinner("Generating Selenium script..."):
                     try:
-                        # Prepare test case data
+                        # Prep test case data
                         if isinstance(selected_test_case, dict) and "raw" not in selected_test_case:
                             test_case_data = selected_test_case
                         else:
@@ -554,7 +756,7 @@ elif page == "Selenium Script Generation":
                         if result.get("status") == "success":
                             st.success("Selenium script generated successfully!")
                             
-                            # Store script in session state
+                            # Store script
                             script_code = result.get("script", "")
                             st.session_state[f"script_{selected_idx}"] = script_code
                             autosave_session()

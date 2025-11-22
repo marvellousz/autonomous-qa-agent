@@ -1,5 +1,5 @@
 """
-API endpoints for document ingestion.
+API endpoints for doc ingestion.
 """
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from typing import List
@@ -12,27 +12,19 @@ from backend.core.chunking import TextChunker
 
 router = APIRouter(prefix="/api/ingestion", tags=["ingestion"])
 
-# Initialize components (in production, use dependency injection)
+# Init components
 parser = DocumentParser()
 chunker = TextChunker(chunk_size=1000, chunk_overlap=200)
-rag_pipeline = None  # Will be initialized in main.py
+rag_pipeline = None  # Set in main.py
 
 
 @router.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
-    """
-    Upload and ingest a document.
-    
-    Args:
-        file: Uploaded file
-        
-    Returns:
-        Status and document info
-    """
+    """Upload and ingest a doc."""
     if rag_pipeline is None:
         raise HTTPException(status_code=500, detail="RAG pipeline not initialized")
     
-    # Save uploaded file temporarily
+    # Save temp file
     suffix = Path(file.filename).suffix
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
         content = await file.read()
@@ -40,23 +32,22 @@ async def upload_document(file: UploadFile = File(...)):
         tmp_path = tmp_file.name
     
     try:
-        # Parse document
+        # Parse doc
         result = parser.parse_file(tmp_path)
         
         if not result or not result.get("text"):
             raise HTTPException(status_code=400, detail="No content extracted from document")
         
-        # Extract text and metadata
         text = result["text"]
         metadata_dict = result["metadata"]
         
-        # Use RecursiveCharacterTextSplitter to chunk the text
+        # Chunk text
         chunks = chunker.chunk_text(text)
         
-        # Prepare chunks with metadata
+        # Prep chunks with metadata
         chunked_docs = [{"text": chunk, "metadata": metadata_dict.copy()} for chunk in chunks]
         
-        # Add to RAG pipeline (which adds to vector DB)
+        # Add to RAG pipeline
         rag_pipeline.add_documents([doc["text"] for doc in chunked_docs], [doc["metadata"] for doc in chunked_docs])
         
         return {
@@ -68,22 +59,14 @@ async def upload_document(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
     finally:
-        # Clean up temp file
+        # Cleanup temp file
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
 
 @router.post("/upload-multiple")
 async def upload_multiple_documents(files: List[UploadFile] = File(...)):
-    """
-    Upload and ingest multiple documents.
-    
-    Args:
-        files: List of uploaded files
-        
-    Returns:
-        Status and summary
-    """
+    """Upload multiple docs."""
     results = []
     for file in files:
         try:
@@ -105,22 +88,7 @@ async def upload_multiple_documents(files: List[UploadFile] = File(...)):
 
 @router.post("/build_kb")
 async def build_knowledge_base(files: List[UploadFile] = File(...)):
-    """
-    Build knowledge base from uploaded files (docs + HTML).
-    
-    Process:
-    1. Receive uploaded files (docs + HTML)
-    2. Parse all files → clean text
-    3. Chunk text
-    4. Generate embeddings
-    5. Store in vector database
-    
-    Args:
-        files: List of uploaded files (PDF, HTML, JSON, TXT, MD)
-        
-    Returns:
-        JSON response with status
-    """
+    """Build KB from uploaded files."""
     if rag_pipeline is None:
         raise HTTPException(status_code=500, detail="RAG pipeline not initialized")
     
@@ -133,7 +101,7 @@ async def build_knowledge_base(files: List[UploadFile] = File(...)):
     try:
         # Process each file
         for file in files:
-            # Save uploaded file temporarily
+            # Save temp file
             suffix = Path(file.filename).suffix
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
                 content = await file.read()
@@ -142,20 +110,23 @@ async def build_knowledge_base(files: List[UploadFile] = File(...)):
                 temp_files.append(tmp_path)
             
             try:
-                # Step 1 & 2: Parse file → clean text
+                # Parse file
                 result = parser.parse_file(tmp_path)
                 
                 if not result or not result.get("text"):
-                    continue  # Skip files with no content
+                    continue  # Skip empty files
                 
-                # Extract text and metadata
                 text = result["text"]
                 metadata_dict = result["metadata"]
                 
-                # Step 3: Chunk text
+                # Use original filename
+                original_filename = file.filename or Path(tmp_path).name
+                metadata_dict["source"] = original_filename
+                
+                # Chunk text
                 chunks = chunker.chunk_text(text)
                 
-                # Prepare chunks with metadata
+                # Prep chunks with metadata
                 for chunk in chunks:
                     all_chunks.append({
                         "text": chunk,
@@ -163,18 +134,15 @@ async def build_knowledge_base(files: List[UploadFile] = File(...)):
                     })
             
             except Exception as e:
-                # Log error but continue processing other files
                 print(f"Error processing {file.filename}: {str(e)}")
                 continue
         
         if not all_chunks:
             raise HTTPException(status_code=400, detail="No content extracted from any files")
         
-        # Step 4 & 5: Generate embeddings and store in vector database
-        # The VectorDB.add_documents handles embedding generation internally
+        # Add to vector DB (handles embeddings)
         rag_pipeline.vectordb.add_documents(all_chunks)
         
-        # Step 6: Return success response
         return {
             "status": "KB Built Successfully",
             "files_processed": len(files),
@@ -186,7 +154,7 @@ async def build_knowledge_base(files: List[UploadFile] = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error building knowledge base: {str(e)}")
     finally:
-        # Clean up temp files
+        # Cleanup temp files
         for tmp_path in temp_files:
             if os.path.exists(tmp_path):
                 try:
@@ -197,12 +165,7 @@ async def build_knowledge_base(files: List[UploadFile] = File(...)):
 
 @router.delete("/clear")
 async def clear_knowledge_base():
-    """
-    Clear the entire knowledge base (vector database).
-    
-    Returns:
-        Status message
-    """
+    """Clear the entire KB."""
     if rag_pipeline is None:
         raise HTTPException(status_code=500, detail="RAG pipeline not initialized")
     
@@ -218,7 +181,7 @@ async def clear_knowledge_base():
                 "documents_cleared": 0
             }
         
-        # Clear the vector database
+        # Clear vector DB
         index_path = rag_pipeline.vectordb.index_path
         
         # Remove index file
@@ -231,7 +194,7 @@ async def clear_knowledge_base():
         if os.path.exists(metadata_file):
             os.unlink(metadata_file)
         
-        # Reinitialize empty index
+        # Reinit empty index
         rag_pipeline.vectordb._initialize_index()
         
         return {
@@ -245,12 +208,7 @@ async def clear_knowledge_base():
 
 @router.get("/stats")
 async def get_ingestion_stats():
-    """
-    Get statistics about ingested documents.
-    
-    Returns:
-        Database statistics
-    """
+    """Get KB stats."""
     if rag_pipeline is None:
         raise HTTPException(status_code=500, detail="RAG pipeline not initialized")
     

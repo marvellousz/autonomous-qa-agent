@@ -1,10 +1,10 @@
 """
-FastAPI main application for Autonomous QA Agent.
+FastAPI backend for QA agent.
 """
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
+# Fix imports
 backend_dir = Path(__file__).parent
 project_root = backend_dir.parent
 sys.path.insert(0, str(project_root))
@@ -13,27 +13,30 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from backend.api import ingestion, generation
 from backend.core.rag import RAGPipeline
 
-# Initialize FastAPI app
+# Setup FastAPI app
 app = FastAPI(
     title="Autonomous QA Agent API",
     description="API for document ingestion and question answering",
     version="1.0.0"
 )
 
-# Configure CORS
+# CORS config (change in prod)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize RAG pipeline
+# Init RAG pipeline
 vectordb_path = os.getenv("VECTORDB_PATH", "data/vectordb")
 os.makedirs(os.path.dirname(vectordb_path), exist_ok=True)
 
@@ -42,18 +45,18 @@ rag_pipeline = RAGPipeline(
     vectordb_path=vectordb_path
 )
 
-# Make RAG pipeline available to routers
+# Share RAG pipeline with routers
 ingestion.rag_pipeline = rag_pipeline
 generation.rag_pipeline = rag_pipeline
 
-# Include routers
+# Add routers
 app.include_router(ingestion.router)
 app.include_router(generation.router)
 
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
+    """API root."""
     return {
         "message": "Autonomous QA Agent API",
         "version": "1.0.0",
@@ -72,7 +75,7 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check."""
     stats = rag_pipeline.vectordb.get_stats()
     return {
         "status": "healthy",

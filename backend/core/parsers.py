@@ -1,10 +1,5 @@
 """
-Document parsing module supporting multiple formats:
-- PDF (PyMuPDF/fitz)
-- HTML (BeautifulSoup)
-- JSON
-- Markdown
-- Plain text
+Doc parser - supports PDF, HTML, JSON, MD, TXT.
 """
 from typing import Dict
 import json
@@ -16,18 +11,10 @@ import re
 
 
 class DocumentParser:
-    """Parse documents from various formats into clean text with metadata."""
+    """Parse docs to clean text."""
     
     def parse_pdf(self, file_path: str) -> Dict:
-        """
-        Parse PDF file using PyMuPDF.
-        
-        Args:
-            file_path: Path to PDF file
-            
-        Returns:
-            Dictionary with text and metadata
-        """
+        """Parse PDF."""
         doc = fitz.open(file_path)
         text_parts = []
         
@@ -39,7 +26,7 @@ class DocumentParser:
         
         doc.close()
         
-        # Combine all pages
+        # Combine pages
         full_text = "\n\n".join(text_parts)
         full_text = self._clean_text(full_text)
         
@@ -54,22 +41,13 @@ class DocumentParser:
         }
     
     def parse_html(self, file_path: str) -> Dict:
-        """
-        Parse HTML file using BeautifulSoup.
-        
-        Args:
-            file_path: Path to HTML file
-            
-        Returns:
-            Dictionary with text and metadata
-        """
+        """Parse HTML."""
         with open(file_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
         
-        # Parse HTML with BeautifulSoup
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        # Remove script and style elements
+        # Remove scripts/styles
         for script in soup(["script", "style"]):
             script.decompose()
         
@@ -88,19 +66,11 @@ class DocumentParser:
         }
     
     def parse_json(self, file_path: str) -> Dict:
-        """
-        Parse JSON file and extract text content.
-        
-        Args:
-            file_path: Path to JSON file
-            
-        Returns:
-            Dictionary with text and metadata
-        """
+        """Parse JSON."""
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        # Convert JSON to readable text
+        # Convert to text
         json_text = json.dumps(data, indent=2, ensure_ascii=False)
         json_text = self._clean_text(json_text)
         
@@ -115,15 +85,7 @@ class DocumentParser:
         }
     
     def parse_txt(self, file_path: str) -> Dict:
-        """
-        Parse plain text file.
-        
-        Args:
-            file_path: Path to text file
-            
-        Returns:
-            Dictionary with text and metadata
-        """
+        """Parse text file."""
         with open(file_path, 'r', encoding='utf-8') as f:
             text = f.read()
         
@@ -139,19 +101,11 @@ class DocumentParser:
         }
     
     def parse_md(self, file_path: str) -> Dict:
-        """
-        Parse Markdown file.
-        
-        Args:
-            file_path: Path to Markdown file
-            
-        Returns:
-            Dictionary with text and metadata
-        """
+        """Parse Markdown."""
         with open(file_path, 'r', encoding='utf-8') as f:
             md_content = f.read()
         
-        # Convert markdown to HTML first, then extract text
+        # Convert MD to HTML then extract text
         html = markdown.markdown(md_content)
         soup = BeautifulSoup(html, 'html.parser')
         text = soup.get_text(separator='\n', strip=True)
@@ -168,15 +122,7 @@ class DocumentParser:
         }
     
     def parse_file(self, file_path: str) -> Dict:
-        """
-        Parse a file based on its extension.
-        
-        Args:
-            file_path: Path to file
-            
-        Returns:
-            Dictionary with text and metadata
-        """
+        """Parse file by extension."""
         path = Path(file_path)
         extension = path.suffix.lower()
         
@@ -191,26 +137,17 @@ class DocumentParser:
         elif extension == '.txt':
             return self.parse_txt(file_path)
         else:
-            # Try as text file
+            # Fallback to text
             return self.parse_txt(file_path)
     
     def _clean_text(self, text: str) -> str:
-        """
-        Clean extracted text by removing excessive whitespace and normalizing.
-        
-        Args:
-            text: Raw text to clean
-            
-        Returns:
-            Cleaned text
-        """
+        """Clean text - remove extra whitespace."""
         # Remove excessive whitespace
-        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)  # Multiple blank lines to double
-        text = re.sub(r'[ \t]+', ' ', text)  # Multiple spaces to single
-        text = re.sub(r' +\n', '\n', text)  # Trailing spaces
-        text = re.sub(r'\n +', '\n', text)  # Leading spaces after newline
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r' +\n', '\n', text)
+        text = re.sub(r'\n +', '\n', text)
         
-        # Remove leading/trailing whitespace
         text = text.strip()
         
         return text

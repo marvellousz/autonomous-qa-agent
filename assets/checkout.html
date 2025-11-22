@@ -398,6 +398,22 @@
                             <label for="phone">Phone Number (Optional)</label>
                             <input type="tel" id="phone" name="phone" placeholder="+1 (555) 123-4567">
                         </div>
+                        
+                        <!-- Shipping Method Section -->
+                        <div class="form-group">
+                            <label>Shipping Method <span class="required">*</span></label>
+                            <div class="radio-group">
+                                <div class="radio-option">
+                                    <input type="radio" id="shipping-standard" name="shipping" value="standard" checked>
+                                    <label for="shipping-standard">Standard Shipping (Free - 5-7 business days)</label>
+                                </div>
+                                
+                                <div class="radio-option">
+                                    <input type="radio" id="shipping-express" name="shipping" value="express">
+                                    <label for="shipping-express">Express Shipping ($10 - 2-3 business days)</label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Payment Method Section -->
@@ -541,10 +557,92 @@
             document.getElementById('total').textContent = '$' + total.toFixed(2);
         }
         
+        // Form validation
+        function validateForm() {
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const address = document.getElementById('address').value.trim();
+            const city = document.getElementById('city').value.trim();
+            const zip = document.getElementById('zip').value.trim();
+            const country = document.getElementById('country').value;
+            const terms = document.getElementById('terms').checked;
+            
+            let isValid = true;
+            
+            // Clear previous error messages
+            document.querySelectorAll('.error-message').forEach(el => el.remove());
+            
+            // Validate name
+            if (!name) {
+                showError('name', 'Name is required');
+                isValid = false;
+            }
+            
+            // Validate email
+            if (!email) {
+                showError('email', 'Email is required');
+                isValid = false;
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                showError('email', 'Please enter a valid email address');
+                isValid = false;
+            }
+            
+            // Validate address
+            if (!address) {
+                showError('address', 'Address is required');
+                isValid = false;
+            }
+            
+            // Validate city
+            if (!city) {
+                showError('city', 'City is required');
+                isValid = false;
+            }
+            
+            // Validate zip
+            if (!zip) {
+                showError('zip', 'ZIP code is required');
+                isValid = false;
+            }
+            
+            // Validate country
+            if (!country) {
+                showError('country', 'Country is required');
+                isValid = false;
+            }
+            
+            // Validate terms
+            if (!terms) {
+                showError('terms', 'You must agree to the Terms and Conditions');
+                isValid = false;
+            }
+            
+            return isValid;
+        }
+        
+        function showError(fieldId, message) {
+            const field = document.getElementById(fieldId);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            field.parentElement.appendChild(errorDiv);
+        }
+        
         // Form submission
         document.getElementById('checkoutForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            alert('Order submitted! (This is a sample checkout page)');
+            
+            if (validateForm()) {
+                // Show success message
+                const successDiv = document.createElement('div');
+                successDiv.className = 'success-message';
+                successDiv.style.cssText = 'background-color: #d1fae5; border-left: 4px solid #10b981; padding: 1rem; border-radius: 5px; margin: 1rem 0; font-size: 18px; font-weight: 600;';
+                successDiv.textContent = 'Payment Successful!';
+                document.querySelector('.checkout-form').insertBefore(successDiv, document.querySelector('.checkout-form').firstChild);
+                
+                // Scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         });
         
         // Card number formatting
